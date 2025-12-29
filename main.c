@@ -397,7 +397,6 @@ void shuffle_now(const char *path){
       char filename[259];
       snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
       start_check(filename);
-      exit(0);
     }
     i++;
   }
