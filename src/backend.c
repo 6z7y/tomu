@@ -34,7 +34,11 @@ typedef struct {
 typedef struct {
   int audioStream;
   int ch;
-  int ch_layout;
+  #ifdef LEGACY_LIBSWRSAMPLE
+    int ch_layout;
+  #else
+    AVChannelLayout ch_layout;
+  #endif
   int sample_rate;
   enum AVSampleFormat sample_fmt;
   int sample_fmt_bytes;
@@ -171,12 +175,10 @@ void *decoder_place(void *arg){
       0, NULL
     );
   #else
-    AVChannelLayout ch_layout;
-    av_channel_layout_default(&ch_layout, inf->ch);
-
     swr_alloc_set_opts2(&swrCTX,
-       &ch_layout, inf->sample_fmt, inf->sample_rate,
-       &ch_layout, codecCTX->sample_fmt, inf->sample_rate,
+      inf->ch_layout, inf->sample_fmt, inf->sample_rate,
+      inf->ch_layout, codecCTX->sample_fmt, inf->sample_rate,
+      0, NULL
     );
   #endif
 
@@ -332,14 +334,10 @@ int scan_now(const char *filename){
 
   #ifdef LEGACY_LIBSWRSAMPLE
     inf.ch = codecCTX->channels;
-  #else
-    inf.ch = codecCTX->ch_layout.nb_channels;
-  #endif
-
-  #ifdef LEGACY_LIBSWRSAMPLE
     inf.ch_layout = codecCTX->channel_layout;
   #else
-    inf.ch_layout = 0;
+    inf.ch = codecCTX->ch_layout.nb_channels;
+    av_channel_layout_default(&ch_layout, inf.ch)
   #endif
 
   inf.sample_rate = codecCTX->sample_rate;
