@@ -165,7 +165,7 @@ void *decoder_place(void *arg){
   AudioInfo *inf = streamCTX->inf;
 
   #ifdef LEGACY_LIBSWRSAMPLE
-    swr_alloc_set_opts(swrCTX,
+    swrCTX = swr_alloc_set_opts(swrCTX,
       inf->ch_layout, inf->sample_fmt, inf->sample_rate,
       inf->ch_layout, codecCTX->sample_fmt, inf->sample_rate,
       0, NULL
