@@ -31,7 +31,6 @@ void shuffle(const char *path){
     perror("F: dir");
     exit(-1);
   }
-  printf("hi\n");
   
   int count = 0;
   while ((entry = readdir(dir)) != NULL ){
