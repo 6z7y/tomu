@@ -1,6 +1,3 @@
-#include "backend.h"
-#include "control.h"
-#include "other.h"
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
@@ -11,6 +8,11 @@
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "backend.h"
+#include "control.h"
+#include "other.h"
+#include "socket.h"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "libs/miniaudio.h"
@@ -217,6 +219,7 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
 
 void stream_audio(StreamContext *streamCTX){
   pthread_t control_thread;
+  pthread_t sock_thread;
   pthread_t decoder_thread;
   AudioInfo *inf = streamCTX->inf;
   PlayBackState *state = streamCTX->state;
@@ -241,7 +244,9 @@ void stream_audio(StreamContext *streamCTX){
   }
 
   pthread_create(&control_thread, NULL, control_place, streamCTX->state);
+  pthread_create(&sock_thread, NULL, run_socket, streamCTX->state);
   pthread_create(&decoder_thread, NULL, decoder_place, streamCTX);
+  
   ma_device_start(&device);
 
   pthread_join(decoder_thread, NULL);
