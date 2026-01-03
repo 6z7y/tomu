@@ -1,6 +1,7 @@
-#include "other.h"
 #include <libavformat/avformat.h>
 #include <libavcodec/codec.h>
+
+#include "other.h"
 
 void cleanUP(AVFormatContext *fmtCTX, AVCodecContext *codecCTX){
   if (fmtCTX ) avformat_close_input(&fmtCTX);
@@ -25,6 +26,34 @@ int get_min(double value){
 
 int get_hour(double value){
   return (int)value / 3600;
+}
+
+void verr(const char *fmt, va_list ap)
+{
+	vfprintf(stderr, fmt, ap);
+	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
+		fputc(' ', stderr);
+		perror(NULL);
+	} else {
+		fputc('\n', stderr);
+	}
+}
+
+void warn(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	verr(fmt, ap);
+	va_end(ap);
+}
+
+void die(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	verr(fmt, ap);
+	va_end(ap);
+	exit(1);
 }
 
 void help(){
