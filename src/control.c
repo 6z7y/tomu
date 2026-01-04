@@ -19,24 +19,33 @@ void *control_place(void *arg){
   raw = old;
 
   raw.c_lflag &= ~(ICANON | ECHO);
+  // raw.c_cc[VMIN] = 0;  // Non-blocking: don't wait for any characters
+  // raw.c_cc[VTIME] = 0; // Non-blocking: no timeout
 
   tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 
   printf("\033[?25l");   // hide cursor
   fflush(stdout);
   
-  while (read(STDIN_FILENO, &c, 1) > 0) {
-    if (c == 'q'){
-      playback_stop(state);
-      break;
+  while (state->running){
 
-    } else if (c == 'p'){
-      if (state->paused) {
-        playback_resume(state);
-      } else {
-        playback_pause(state);
+    int n = read(STDIN_FILENO, &c, 1);
+    if (n > 0 ){
+      if (c == 'q'){
+        playback_stop(state);
+        usleep(300000);
+        break;
+
+      } else if (c == 'p'){
+        if (state->paused) {
+          playback_resume(state);
+        } else {
+          playback_pause(state);
+        }
+      } else if (c == 0){
+        usleep(100000);
       }
-    } else if (c == 0){
+    } else if (n == 0){
       usleep(100000);
     }
   }
@@ -60,27 +69,11 @@ void playback_resume(PlayBackState *state){
 
 void playback_stop(PlayBackState *state){
   pthread_mutex_lock(&state->lock);
-  state->running = 0;
   state->paused = 0;
+  state->running = 0;
   pthread_cond_signal(&state->waitKudasai);
   pthread_mutex_unlock(&state->lock);
 }
-
-// int playback_paused(PlayBackState *state){
-//   int paused;
-//   pthread_mutex_lock(&state->lock);
-//   paused = state->paused;
-//   pthread_mutex_unlock(&state->lock);
-//   return paused;
-// }
-
-// int playback_resumed(PlayBackState *state){
-//   int resumed;
-//   pthread_mutex_lock(&state->lock);
-//   resumed = state->running;
-//   pthread_mutex_unlock(&state->lock);
-//   return resumed;
-// }
 
 void shuffle(const char *path){
   srand(time(NULL));

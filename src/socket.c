@@ -10,7 +10,7 @@
 #include "control.h"
 #include "other.h"
 
-void cleanup_socket(){
+void cleanup_socket(int sig){
 	unlink(SOCKET_PATH);
 	die("");
 }
@@ -58,5 +58,5 @@ void *run_socket(void *arg)
 		close(client);
 	}
 	close(sock);
-	cleanup_socket();
+	cleanup_socket(0);
 }

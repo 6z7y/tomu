@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "backend.h"
@@ -17,7 +18,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "libs/miniaudio.h"
 
-#if LIBSWRESAMPLE_VERSION_MAJOR <= 3 
+#if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
@@ -201,7 +202,7 @@ void *decoder_place(void *arg){
     if (!state->running) break;
   }
 
-  playback_stop(state);
+  // playback_stop(state);
 
   if (swrCTX ) swr_free(&swrCTX);
   av_frame_free(&frame);
@@ -249,15 +250,23 @@ void stream_audio(StreamContext *streamCTX){
   
   ma_device_start(&device);
 
-  pthread_join(decoder_thread, NULL);
   // playback_stop(state);
   // usleep(50000);
   usleep(100000); // 100ms
+
+  pthread_join(decoder_thread, NULL);
+  // pthread_join(control_thread, NULL);
+
+  usleep(30000);
+
+  // ma_device_stop(&device);
+  ma_device_stop(&device);
   ma_device_uninit(&device);
 
-  pthread_join(control_thread, NULL);
-  // usleep(30000);
+  // pthread_cancel(sock_thread);
+  // pthread_cancel(decoder_thread);
 
+  pthread_cancel(control_thread);
   audio_buffer_destroy(streamCTX->buf);
   pthread_mutex_destroy(&state->lock);
   pthread_cond_destroy(&state->waitKudasai);

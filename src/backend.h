@@ -7,7 +7,7 @@
 #include <libswresample/swresample.h>
 #include "libs/miniaudio.h"
 
-#if LIBSWRESAMPLE_VERSION_MAJOR <= 3 
+#if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
 

@@ -4,6 +4,5 @@
 #define SOCKET_PATH "/tmp/tomu-sock"
 
 void *run_socket(void *arg);
-void cleanup_socket();
-
+void cleanup_socket(int sig);
 #endif
