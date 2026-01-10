@@ -52,18 +52,6 @@ static const int kbds_len = sizeof(keybindings) / sizeof(struct keybinding);
 void *handle_input(void *arg){
   PlayBackState *state = (PlayBackState*)arg;
 
-  struct termios old, raw;
-
-  tcgetattr(STDIN_FILENO, &old);
-  raw = old;
-
-  raw.c_lflag &= ~(ICANON | ECHO);
-
-  tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-
-  printf("\033[?25l"); // hide cursor
-  fflush(stdout);
-
   struct pollfd pfd = {
     .fd = STDIN_FILENO,
     .events = POLLIN
@@ -109,10 +97,6 @@ void *handle_input(void *arg){
       perror("[F] poll error");
   }
 
-  printf("\033[?25h\r"); // show cursor
-  fflush(stdout);
-
-  tcsetattr(STDIN_FILENO, TCSANOW, &old);
   return NULL;
 }
 

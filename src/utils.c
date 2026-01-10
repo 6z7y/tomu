@@ -2,6 +2,8 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/codec.h>
 #include <sys/stat.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "control.h"
 #include "utils.h"
@@ -78,3 +80,20 @@ void die(const char *fmt, ...)
 	exit(-1);
 }
 
+
+struct termios init_terminal() {
+    struct termios orig, raw;
+    tcgetattr(STDIN_FILENO, &orig);
+    raw = orig;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    printf("\033[?25l"); // hide cursor
+    fflush(stdout);
+    return orig;
+}
+
+void deinit_terminal(const struct termios* mode) {
+    tcsetattr(STDIN_FILENO, TCSANOW, mode);
+    printf("\033[?25h"); // show cursor
+    fflush(stdout);
+}

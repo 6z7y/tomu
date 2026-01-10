@@ -347,6 +347,9 @@ void stream_audio(StreamContext *streamCTX){
     return;
   }
 
+  // Sets terminal mode to raw and hides cursor
+  struct termios orig_mode = init_terminal();
+
   // exec 3 worker threads
   pthread_create(&control_thread, NULL, handle_input, streamCTX->state);
   pthread_create(&sock_thread, NULL, run_socket, streamCTX->state);
@@ -355,6 +358,9 @@ void stream_audio(StreamContext *streamCTX){
   // start device and wait till there's not more samples to play
   ma_device_start(&device);
   pthread_join(decoder_thread, NULL);
+
+  // Restores term mode to the original one
+  deinit_terminal(&orig_mode);
 
 
   // audio is end now must off all thing (I'll keep this it's funny)
