@@ -31,7 +31,7 @@ inline void help()
     " (Space) = pause/resume\n"
     " (q) = quit\n"
     " (s) = shuffle toggle\n"
-    " (l) = loop toggle"
+    " (l) = loop toggle\n"
     " (-) = decrease volume\n"
     " (+) = increase volume\n"
     " (↑/→) = audio seek forward +5s/1m\n"
