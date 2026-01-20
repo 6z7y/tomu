@@ -262,7 +262,7 @@ inline void progress(PlayBackState *state, double current_time, int duration_tim
       printf(".");
   }
 
-    printf("] %d:%02d:%02d / %d:%02d:%02d (%.00f%%) | %.2fx v: %.0f%%, s:%d, l:%d\r",
+    printf("] %d:%02d:%02d / %d:%02d:%02d (~%.00f%%) | %.2fx v: %.0f%%, s:%d, l:%d\r",
     get_hour(current_time), get_min(current_time), get_sec(current_time), 
     get_hour(duration_time), get_min(duration_time), get_sec(duration_time),
     (current_time / duration_time) * 100.0, state->speed,
