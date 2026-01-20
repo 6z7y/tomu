@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     }
 
     else if ( strcmp("--shuffle", option) == 0 ){
-      //DirFiles.shuffle = true; // TODO mv this later
+      DirFiles.shuffle = true; // TODO mv this later
       path_handle(path, false);
       return 0;
     }
