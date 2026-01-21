@@ -1,3 +1,8 @@
+## A: 6z7y 0.0.11_1_beta - 2026-01-21
+- rebuild source struct
+- change struct PlayBackState -> Audio_State
+- change struct StreamContext -> PlayBackContext
+- UI: Show "(Paused)" when paused
 ## A: Gfed 0.0.11_dirty - 2026-01-18
 - Support directory playback (load and play all files in a path)
 - Implement Shuffle and Loop toggles (keys: 's', 'l')
