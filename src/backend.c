@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "backend.h"
@@ -23,6 +24,7 @@
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
+PlayBackContext ctx = {0};
 
 // WRITE AUDIO DATA TO BUFFER
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)
@@ -88,18 +90,17 @@ void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 // decoder thread
 void *run_decoder(void *arg)
 {
-  StreamContext *streamCTX = (StreamContext*)arg;
-  AVFormatContext *fmtCTX = streamCTX->fmtCTX;
-  AVCodecContext *codecCTX = streamCTX->codecCTX;
-  Audio_Info *inf = streamCTX->inf;
-  PlayBackState *state = streamCTX->state;
+  AVFormatContext *fmtCTX = ctx.fmtCTX;
+  AVCodecContext *codecCTX = ctx.codecCTX;
+  Audio_Info *inf = &ctx.inf;
+  Audio_State *state = &ctx.state;
 
   SwrContext *swrCTX = NULL;        // resampler for sample format changes
   SwrContext *speed_swrCTX = NULL;  // Separate resampler for playback speed changes
 
   // Setup format converter (planar->interleaved if needed)
   if ( av_sample_fmt_is_planar(codecCTX->sample_fmt) ){
-    setup_sample_fmt_resampler(streamCTX, inf, &swrCTX);
+    setup_sample_fmt_resampler(inf, &swrCTX);
     
     if (swrCTX) {
       if ( swr_init(swrCTX) < 0 )
@@ -138,10 +139,9 @@ decode:
         total_samples_played += frame->nb_samples;
 
         pthread_mutex_lock(&state->lock);
-        
           // Handle seek request
           if (state->seek_request) {
-            handle_audio_seek(streamCTX, &duration_sec, &total_samples_played);
+            handle_audio_seek(&duration_sec, &total_samples_played);
             av_packet_unref(packet);
             av_frame_unref(frame);
             pthread_mutex_unlock(&state->lock);
@@ -160,9 +160,17 @@ decode:
           
           // Create new speed resampler if speed ≠ 1.0
           if (state->speed != 1.0f) {
-            setup_speed_resampler(streamCTX, inf, frame, &speed_swrCTX);
+            setup_speed_resampler(inf, frame, &speed_swrCTX);
           }
         }
+        pthread_mutex_unlock(&state->lock);
+
+
+        // Check pause state
+        pthread_mutex_lock(&state->lock);
+        while (state->paused)
+          pthread_cond_wait(&state->wait_cond, &state->lock);
+        progress(state, current_time, duration_sec);
         pthread_mutex_unlock(&state->lock);
 
         // Process audio based on conversion needs
@@ -215,7 +223,7 @@ decode:
         
         // Write to buffer
         if (output_data) {
-          audio_buffer_write(streamCTX->buf, output_data, output_bytes);
+          audio_buffer_write(ctx.buf, output_data, output_bytes);
           
           // Free if we allocated memory (for speed_swrCTX or swrCTX paths)
           if (output_data != frame->data[0]) {
@@ -228,11 +236,6 @@ decode:
     }
     av_packet_unref(packet);
 
-    // Check pause state
-    pthread_mutex_lock(&state->lock);
-    while (state->paused)
-      pthread_cond_wait(&state->wait_cond, &state->lock);
-    pthread_mutex_unlock(&state->lock);
 
     if (!state->running) break;
   }
@@ -263,13 +266,12 @@ decode:
 // miniaudio will use this callback to read PCM samples
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
 {
-  StreamContext *streamCTX = (StreamContext*)ma_config->pUserData;
-  Audio_Info *inf = streamCTX->inf;
-  PlayBackState *state = streamCTX->state;
+  Audio_Info *inf = &ctx.inf;
+  Audio_State *state = &ctx.state;
   
   // Read audio data
   int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
-  audio_buffer_read(streamCTX->buf, output, bytes);
+  audio_buffer_read(ctx.buf, output, bytes);
 
   // check if paused
   pthread_mutex_lock(&state->lock);
@@ -284,109 +286,95 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
   pthread_mutex_unlock(&state->lock);
 }
 
-void store_information(StreamContext *streamCTX, int audioStream_index, enum AVSampleFormat output_sample_fmt );
-
 // reads the file and creates a Stream Context
-void get_audio_info(const char *filename, StreamContext *streamCTX)
+void get_audio_info(const char *filename)
 {
   // Read File
-  if ( avformat_open_input(&streamCTX->fmtCTX, filename, NULL, NULL) < 0 )
+  if ( avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0 )
     die("ffmpeg: file type is not supported");
 
-  // Read stream information from the file (codec, format, duration, etc.)
-  if ( avformat_find_stream_info(streamCTX->fmtCTX, NULL) < 0 )
+  // Check about Streams exists?
+  if ( avformat_find_stream_info(ctx.fmtCTX, NULL) < 0 )
     die("ffmpeg: cannot find any streams");
 
-  // try get audio stream index from container
+  // get audioStream
   int audioStream_index = -1;
-  audioStream_index = get_stream(streamCTX->fmtCTX, AVMEDIA_TYPE_AUDIO);
+  audioStream_index = get_stream(AVMEDIA_TYPE_AUDIO);
 
   if ( audioStream_index == -1 )
     die("file: can't find AudioStream");
 
-  // get the information about audio stream
-  const AVCodecParameters *codecPAR = streamCTX->fmtCTX->streams[audioStream_index]->codecpar;
+  // get information codec about audio stream
+  const AVCodecParameters *codecPAR = ctx.fmtCTX->streams[audioStream_index]->codecpar;
   const AVCodec *codecID = avcodec_find_decoder(codecPAR->codec_id); // get correct codec id for decoder
 
   // allocate empty decoder
-  streamCTX->codecCTX = avcodec_alloc_context3(codecID);
+  ctx.codecCTX = avcodec_alloc_context3(codecID);
 
-  if ( !streamCTX->codecCTX )
+  if ( !ctx.codecCTX )
     die("ffmpeg: failed allocate codec!");
 
-  // Copy information codec to decoder
-  avcodec_parameters_to_context(streamCTX->codecCTX, codecPAR);
+  // Copy codec information to decoder context
+  avcodec_parameters_to_context(ctx.codecCTX, codecPAR);
 
   // initialize decoder with actual codec
-  if (avcodec_open2(streamCTX->codecCTX, codecID, NULL) < 0)
+  if (avcodec_open2(ctx.codecCTX, codecID, NULL) < 0)
     die("ffmpeg: failed init decoder!");
 
-  // Speakers need INTERLEAVED format! We must convert PLANAR to INTERLEAVED. (see diagram doc for understand)
-  enum AVSampleFormat input_sample_fmt = streamCTX->codecCTX->sample_fmt;
+  // Speakers need INTERLEAVED format! Convert PLANAR to INTERLEAVED if needed.
+  enum AVSampleFormat input_sample_fmt = ctx.codecCTX->sample_fmt;
   enum AVSampleFormat output_sample_fmt = input_sample_fmt;
   
-  // check if planar give interleaved format or skip
   if ( av_sample_fmt_is_planar(input_sample_fmt) ){
     output_sample_fmt = get_interleaved(input_sample_fmt);
   }
 
-  // Store audio info
-  store_information(streamCTX, audioStream_index, output_sample_fmt);
+  // Store audio info to a struct audio
+  store_information(audioStream_index, output_sample_fmt);
 }
 
-
 // this handles playing audio files.
-int playback_run(const char *filename, uint loop)
+int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 {
-  // 1. create storege boxes
-  Audio_Info inf = {0};
-  PlayBackState state = {0};
-  StreamContext streamCTX = {0};
-
-  streamCTX.inf = &inf;
-  streamCTX.buf = NULL;
-  streamCTX.state = &state;
-  streamCTX.fmtCTX = NULL;
-  streamCTX.codecCTX = NULL;
-
   av_log_set_level(AV_LOG_QUIET); // ignore warning
 
-  // 2. get file information
-  get_audio_info(filename, &streamCTX);
+  // 1. get file information
+  get_audio_info(filename);
 
+  // 2. initialize a buffer, size = 500ms
+  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.5;
 
-  // 3. initialize a buffer, size = 500ms
-  int capacity = (inf.sample_rate) * (inf.ch) * (inf.sample_fmt_bytes) * 0.5;
-  streamCTX.buf = audio_buffer_init(capacity); // initialize buffer
+  ctx.buf = audio_buffer_init(capacity); // initialize buffer
 
   // 4. init miniaudio device (for sending PCM samples to speaker)
   ma_device device;
-  ma_device_config ma_config = init_miniaudioConfig(&inf, &streamCTX);
+  ma_device_config ma_config = init_miniaudioConfig(&ctx.inf);
 
   // 4.1 initialize the device output
   if (ma_device_init(NULL, &ma_config, &device) != MA_SUCCESS ){
-    audio_buffer_destroy(streamCTX.buf);
-    pthread_mutex_destroy(&state.lock);
-    pthread_cond_destroy(&state.wait_cond);
-    cleanUP(streamCTX.fmtCTX, streamCTX.codecCTX);
+    audio_buffer_destroy(ctx.buf);
+    pthread_mutex_destroy(&ctx.state.lock);
+    pthread_cond_destroy(&ctx.state.wait_cond);
+    cleanUP();
     die("miniaudio: something happend when initialize device output");
   }
 
   // 5. Display Outputs
   // progress output inside decoder must be there
-  init_playbackstatus(&state, loop);
-  if (streamCTX.fmtCTX->metadata)
-    print_metadata(streamCTX.fmtCTX->metadata);
+  init_playbackstatus(&ctx.state, loop_mode, shuffle_mode);
+
+  if (ctx.fmtCTX->metadata)
+    print_metadata(ctx.fmtCTX->metadata);
 
   printf("Playing: %s\n",  filename);
-  printf("%.2dHz, %dch, %s\n", inf.sample_rate, inf.ch, av_get_sample_fmt_name(inf.sample_fmt));
+  printf("%.2dHz, %dch, %s\n", ctx.inf.sample_rate, ctx.inf.ch, av_get_sample_fmt_name(ctx.inf.sample_fmt));
 
   // 6 start threads
   pthread_t control_thread, sock_thread, decoder_thread;
 
-  pthread_create(&control_thread, NULL, handle_input, &state); // terminal controls
-  pthread_create(&sock_thread, NULL, run_socket, &state); // socket controls
-  pthread_create(&decoder_thread, NULL, run_decoder, &streamCTX); // decoder ._. 
+  pthread_create(&control_thread, NULL, handle_input, &ctx.state); // terminal controls
+  pthread_create(&sock_thread, NULL, run_socket, &ctx.state); // socket controls
+  pthread_create(&decoder_thread, NULL, run_decoder, NULL); // decoder ._. 
   
   // Start audio playback device
   ma_device_start(&device);
@@ -399,9 +387,9 @@ int playback_run(const char *filename, uint loop)
   // 7. clean up
   ma_device_stop(&device);
   ma_device_uninit(&device);
-  audio_buffer_destroy(streamCTX.buf);
-  pthread_mutex_destroy(&state.lock);
-  pthread_cond_destroy(&state.wait_cond);
-  cleanUP(streamCTX.fmtCTX, streamCTX.codecCTX);
+  audio_buffer_destroy(ctx.buf);
+  pthread_mutex_destroy(&ctx.state.lock);
+  pthread_cond_destroy(&ctx.state.wait_cond);
+  cleanUP();
   return 0;
 }

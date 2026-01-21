@@ -13,11 +13,12 @@
 #include "control.h"
 #include "utils.h"
 
-struct keybinding { const char *key; void (*handler)(PlayBackState*); };
+struct keybinding { const char *key; void (*handler)(Audio_State*); };
 
 #define CTRL_KEY(key) (const char[]){key - 'a' + 1 , '\0'} // remove this when you move the code to socket function
 
 static const struct keybinding keybindings[] = {
+    {"\n"    ,       playback_next_audio}, // enter
     {" "     ,       playback_toggle},
     {"q"     ,       playback_stop},
     {"-"     ,       volume_decrease},
@@ -39,7 +40,7 @@ static const int kbds_len = sizeof(keybindings) / sizeof(struct keybinding);
 
 // For interactive player
 void *handle_input(void *arg){
-  PlayBackState *state = (PlayBackState*)arg;
+  Audio_State *state = (Audio_State*)arg;
 
   struct termios old, raw;
 
@@ -121,20 +122,20 @@ void *handle_input(void *arg){
 
 // functions for playback
 // fn toggle pause/resume
-inline void playback_toggle(PlayBackState *state) {
+inline void playback_toggle(Audio_State *state) {
     if (state->paused)
         playback_resume(state);
     else 
         playback_pause(state);
 }
 
-inline void playback_pause(PlayBackState *state){
+inline void playback_pause(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->paused = 1;
   pthread_mutex_unlock(&state->lock);
 }
 
-inline void playback_resume(PlayBackState *state){
+inline void playback_resume(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->paused = 0;
     pthread_cond_broadcast(&state->wait_cond);
@@ -142,7 +143,7 @@ inline void playback_resume(PlayBackState *state){
 }
 
 // Stops playback and wakes any waiting threads
-inline void playback_stop(PlayBackState *state){
+inline void playback_stop(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->paused = 0;
     state->running = 0;
@@ -158,7 +159,7 @@ inline void playback_stop(PlayBackState *state){
 // control audio seek
 
 // Requests a seek forward by 5 seconds
-void seek_forward_sec(PlayBackState *state)
+void seek_forward_sec(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     if (!state->seek_request){
@@ -171,7 +172,7 @@ void seek_forward_sec(PlayBackState *state)
 
 
 // Requests a seek forward by 1 min
-void seek_forward_min(PlayBackState *state)
+void seek_forward_min(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     if (!state->seek_request){
@@ -183,7 +184,7 @@ void seek_forward_min(PlayBackState *state)
 }
 
 // Requests a seek backward by 5 seconds
-void seek_backward_sec(PlayBackState *state)
+void seek_backward_sec(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     if (!state->seek_request){
@@ -195,7 +196,7 @@ void seek_backward_sec(PlayBackState *state)
 }
 
 // Requests a seek backward by 1 min
-void seek_backward_min(PlayBackState *state)
+void seek_backward_min(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     if (!state->seek_request){
@@ -210,7 +211,7 @@ void seek_backward_min(PlayBackState *state)
 
 // control speed playback
 
-void playback_speed_increase(PlayBackState *state)
+void playback_speed_increase(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     state->speed += 0.05f;
@@ -218,7 +219,7 @@ void playback_speed_increase(PlayBackState *state)
   pthread_mutex_unlock(&state->lock);
 }
 
-void playback_speed_decrease(PlayBackState *state)
+void playback_speed_decrease(Audio_State *state)
 {
   pthread_mutex_lock(&state->lock);
     state->speed -= 0.05f;
@@ -230,14 +231,14 @@ void playback_speed_decrease(PlayBackState *state)
 
 // control volume playback
 
-inline void volume_increase(PlayBackState *state){
+inline void volume_increase(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->volume += 0.02f;
     if (state->volume > 1.26f) state->volume = 1.26f;
   pthread_mutex_unlock(&state->lock);
 }
 
-inline void volume_decrease(PlayBackState *state){
+inline void volume_decrease(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->volume -= 0.02f;
     if (state->volume < 0.00f) state->volume = 0.00f;
@@ -245,7 +246,7 @@ inline void volume_decrease(PlayBackState *state){
 }
 // ===================================================================
 
-void change_Audio(PlayBackState *state){
+void change_Audio(Audio_State *state){
     pthread_mutex_lock(&state->lock);
     state->running = 0;
     state->paused = 0;
@@ -255,12 +256,12 @@ void change_Audio(PlayBackState *state){
     // Note: KeepPlayingDirectory stays 1 (true) by default, 
     // so utils.c knows to play the next file
 }
-void loop_toggle(PlayBackState *state) {
+void loop_toggle(Audio_State *state) {
     if (state->looping) loop_false(state);
     else loop_true(state);
 }
 
-inline void loop_true(PlayBackState *state){
+inline void loop_true(Audio_State *state){
   pthread_mutex_lock(&state->lock);
   state->looping = true;
   DirFiles.DirLoopStop = false;
@@ -268,45 +269,45 @@ inline void loop_true(PlayBackState *state){
   pthread_mutex_unlock(&state->lock);
 }
 
-inline void loop_false(PlayBackState *state){
+inline void loop_false(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     state->looping = false;
     DirFiles.DirLoopStop = true;
   pthread_mutex_unlock(&state->lock);
 }
 
-void shuffle_toggle(PlayBackState *state) {
-    if (DirFiles.shuffle) shuffle_false(state);
+void shuffle_toggle(Audio_State *state) {
+    if (state->shuffle) shuffle_false(state);
     else shuffle_true(state);
 }
 
-inline void shuffle_true(PlayBackState *state){
+inline void shuffle_true(Audio_State *state){
   pthread_mutex_lock(&state->lock);
   // state->shuffle = true;
-  DirFiles.shuffle = true;
+  state->shuffle = true;
   pthread_cond_broadcast(&state->wait_cond);
   pthread_mutex_unlock(&state->lock);
 }
 
-inline void shuffle_false(PlayBackState *state){
+inline void shuffle_false(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     // state->shuffle = false;
-    DirFiles.shuffle = false;
+    state->shuffle = false;
   pthread_mutex_unlock(&state->lock);
 }
 
-void stopAndShuffle(PlayBackState* state){
-  shuffle(); 
+void stopAndShuffle(Audio_State* state){
+  do_shuffle(); 
   change_Audio(state);
 }
 
-void shuffle(){
+void do_shuffle(){
   srand(time(NULL));
   if(DirFiles.totalFiles > 0)
     DirFiles.currentFile = rand() % (DirFiles.totalFiles);
 }
 
-void next(PlayBackState *state){
+void next(Audio_State *state){
   DirFiles.currentFile++;
   if (DirFiles.currentFile >= DirFiles.totalFiles)
     DirFiles.currentFile = 0; 
@@ -314,7 +315,7 @@ void next(PlayBackState *state){
   change_Audio(state); 
 }
 
-void prev(PlayBackState *state){
+void prev(Audio_State *state){
   DirFiles.currentFile--;
   if (DirFiles.currentFile < 0)
     DirFiles.currentFile = DirFiles.totalFiles-1; 
@@ -322,15 +323,15 @@ void prev(PlayBackState *state){
   change_Audio(state); 
 }
 
-inline void playback_next_audio(PlayBackState *state){
-  if(DirFiles.shuffle)
+inline void playback_next_audio(Audio_State *state){
+  if(state->shuffle)
     stopAndShuffle(state);
   else 
     next(state);
 }
 
-inline void playback_prev_audio(PlayBackState *state){
-  if(DirFiles.shuffle)
+inline void playback_prev_audio(Audio_State *state){
+  if(state->shuffle)
     stopAndShuffle(state);
   else
    prev(state);

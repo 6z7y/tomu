@@ -9,8 +9,8 @@
 extern uint KeepPlayingDirectory;
 
 void help();
-void cleanUP(AVFormatContext *fmtCTX, AVCodecContext *codecCTX);
-void path_handle(const char *path, uint loop);
+void cleanUP();
+void path_handle(const char *path, uint loop_mode, uint shuffle_mode);
 
 void verr(const char *fmt, va_list ap);
 void warn(const char *fmt, ...);

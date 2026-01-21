@@ -20,7 +20,7 @@ void cleanup_socket(int sig){
 // TODO: abstract input reading from "control.c" to be used in here as well since we have code duplication
 void *run_socket(void *arg)
 {
-	PlayBackState *state = (PlayBackState*)arg;
+	Audio_State *state = (Audio_State*)arg;
 	unlink(SOCKET_PATH);
 	signal(SIGTERM, cleanup_socket);
 	signal(SIGINT, cleanup_socket);

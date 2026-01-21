@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// #include "control.h"
-#include "backend.h"
 #include "utils.h"
 
 #define PROG_NAME "tomu"
@@ -23,13 +21,12 @@ int main(int argc, char *argv[])
   if ( argv[1][0] == '-' && argv[1][1] == '-' ){
 
     if ( strcmp("--loop", option ) == 0 ){
-      path_handle(path, true);
+      path_handle(path, true, false);
       return 0;
     }
 
     else if ( strcmp("--shuffle", option) == 0 ){
-      DirFiles.shuffle = true; // TODO mv this later
-      path_handle(path, false);
+      path_handle(path, false, true);
       return 0;
     }
 
@@ -50,7 +47,6 @@ int main(int argc, char *argv[])
   }
 
   // 3. No options? Just handle the path (check file or directory)  
-  DirFiles.shuffle = true; // TODO mv this later
-  path_handle(path, false);
+  path_handle(path, false, true);
   return 0;
 }

@@ -21,12 +21,11 @@ typedef struct {
   uint looping;
   uint shuffle;
   int seek_request; // Flag: 1 = seek needed
-  //
   int64_t seek_target; // Where seek to (in microseconds)
   pthread_mutex_t lock;
   pthread_cond_t wait_cond;
 
-} PlayBackState;
+} Audio_State;
 
 typedef struct {
   uint8_t *pcm_data;           // Audio data storage
@@ -59,20 +58,22 @@ typedef struct {
 
 
 // struct for point context used in another functions (needed)
-typedef struct {
+typedef struct PlayBackContext{
+  Audio_State state;
   Audio_Buffer *buf;
-  Audio_Info *inf;
+  Audio_Info inf;
   AVFormatContext *fmtCTX;
   AVCodecContext *codecCTX;
-  PlayBackState *state;
 
-} StreamContext;
+} PlayBackContext;
+
+extern PlayBackContext ctx;
 
 // struct for data of the files in dir
 typedef struct {
   int totalFiles;
   int currentFile;
-  uint shuffle;
+  // uint shuffle;
   // this for cleaning (needed)
   bool DirLoopStop;
   char** files;
@@ -80,7 +81,7 @@ typedef struct {
 } dirFiles;
 extern dirFiles DirFiles;
 
-int playback_run(const char *filename, uint loop_mode);
+int playback_run(const char *filename, uint loop_mode, uint shuffle_mode);
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount);
 
 #endif
