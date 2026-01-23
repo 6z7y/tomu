@@ -28,6 +28,7 @@ inline void help()
 
     "\nkeys:\n"
     " (Space) = pause/resume\n"
+    " (Backspace) = reset playback speed\n"
     " (q) = quit\n"
     " (s) = shuffle toggle\n"
     " (l) = loop toggle\n"
