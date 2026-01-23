@@ -16,6 +16,7 @@ void seek_forward_min(Audio_State *state);
 void seek_backward_sec(Audio_State *state);
 void seek_backward_min(Audio_State *state);
 
+void playback_speed_defualt(Audio_State *state);
 void playback_speed_increase(Audio_State *state);
 void playback_speed_decrease(Audio_State *state);
 

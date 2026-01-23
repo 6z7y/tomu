@@ -19,6 +19,7 @@ struct keybinding { const char *key; void (*handler)(Audio_State*); };
 
 static const struct keybinding keybindings[] = {
     {"\n"    ,       playback_next_audio}, // enter
+    {"\177"  ,       playback_speed_defualt}, // backspace
     {" "     ,       playback_toggle},
     {"q"     ,       playback_stop},
     {"-"     ,       volume_decrease},
@@ -210,6 +211,13 @@ void seek_backward_min(Audio_State *state)
 // =================================================================
 
 // control speed playback
+void playback_speed_defualt(Audio_State *state)
+{
+  pthread_mutex_lock(&state->lock);
+    state->speed = 1.00f;
+  pthread_mutex_unlock(&state->lock);
+}
+
 
 void playback_speed_increase(Audio_State *state)
 {
