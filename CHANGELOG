@@ -1,3 +1,5 @@
+## A: 6z7y 0.0.11_2_beta - 2026-01-23
+- Make Backspace key get default playback speed
 ## A: 6z7y 0.0.11_1_beta - 2026-01-21
 - rebuild source struct
 - change struct PlayBackState -> Audio_State
