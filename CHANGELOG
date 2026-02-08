@@ -1,3 +1,24 @@
+# A: 6z7y 1.0.4_beta - 2026-2-8
+- Removed server & socket
+- Added audio filter
+# A: 6z7y 1.0.3_beta - 2026-02-04
+- fix something
+- delete dup code
+- add comment
+# A: 6z7y 1.0.2_beta - 2026-02-02
+- Fixed: CLI now properly connects to Unix socket at /tmp/tomu-sock
+## A: 6z7y 1.0.1_beta - 2026-02-02
+- tomucli still have issus (not work)
+- clean source (still not work)
+## A: 6z7y 1.0.0_beta - 2026-01-31
+- change how tools works (server & client)
+- remove control termios from server (tomu)
+- add CLI-client (tomucli)
+- add TUI-client (tomutui) but still without ui not work
+- control keys & ui from client
+- rebuild Makefile
+- close safe (ctrl + c) or sigint/sigterm
+- imporve source code
 ## A: 6z7y 0.0.11_2_beta - 2026-01-23
 - Make Backspace key get default playback speed
 ## A: 6z7y 0.0.11_1_beta - 2026-01-21
