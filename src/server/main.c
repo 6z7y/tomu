@@ -4,7 +4,7 @@
 #include "utils.h"
 
 #define PROG_NAME "tomu"
-#define PROG_VER "0.0.11"
+#define PROG_VER "1.0.4"
 
 int main(int argc, char *argv[])
 {
