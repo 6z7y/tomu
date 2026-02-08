@@ -1,37 +1,69 @@
-CC = cc
-CFLAGS = -Wall -g -O3 -Iinclude
-LIBS = -lm -lpthread -lavformat -lavcodec -lavutil -lswresample
+# core option installer
+CC := cc
+CFLAGS := -Wall -g -O3 -Iinclude
+LIBS := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil
 
-INSTALL_PATH = /usr/bin
-
-SERVER_SRC_DIR := src
+#Paths
+INSTALL_PATH := /usr/bin
 BUILD_DIR := build
 
-# Server: ALL source files needed
-SERVER_SOURCES := $(wildcard $(SERVER_SRC_DIR)/*.c) # for clients, the source should better exist in a separate directory from the server
-SERVER_OBJECTS := $(patsubst $(SERVER_SRC_DIR)/%, $(BUILD_DIR)/%, $(SERVER_SOURCES:.c=.o))
+# (Server)
+SERVER_NAME := tomu
+SERVER_DIR := src/server
+SERVER_BUILD_DIR := $(BUILD_DIR)/server
+SERVER_SOURCES := $(wildcard $(SERVER_DIR)/*.c)
+SERVER_OBJECTS := $(patsubst $(SERVER_DIR)/%.c, $(SERVER_BUILD_DIR)/%.o, $(SERVER_SOURCES))
 
-SERVER_BIN = tomu
+# # cli (CLIENT)
+# CLIENT_CLI_NAME := tomucli
+# CLIENT_CLI_DIR := src/clients/cli
+# CLIENT_CLI_BUILD_DIR := $(BUILD_DIR)/clients/cli
+# CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
+# CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
+#
+# # tui (CLIENT)
+# CLIENT_TUI_NAME := tomutui
+# CLIENT_TUI_DIR := src/clients/tui
+# CLIENT_TUI_BUILD_DIR := $(BUILD_DIR)/clients/tui
+# CLIENT_TUI_SOURCES := $(wildcard $(CLIENT_TUI_DIR)/*.c)
+# CLIENT_TUI_OBJECTS := $(patsubst $(CLIENT_TUI_DIR)/%.c, $(CLIENT_TUI_BUILD_DIR)/%.o, $(CLIENT_TUI_SOURCES))
 
-BINS = $(SERVER_BIN)
+# TODO: later
+# CLIENT_GUI_SRC_PATH := src/clients/gui
 
-all: $(SERVER_BIN)
+all: $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME)
 
-$(SERVER_BIN): $(SERVER_OBJECTS)
-	@mkdir -p $(BUILD_DIR)
+$(SERVER_NAME): $(SERVER_OBJECTS)
 	$(CC) $(SERVER_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
 
-$(BUILD_DIR)/%.o: $(SERVER_SRC_DIR)/%.c
-	@mkdir -p $(BUILD_DIR)
-	$(CC) -c $< -o $@ $(CFLAGS) $(LIBS)
+# $(CLIENT_CLI_NAME): $(CLIENT_CLI_OBJECTS) $(SERVER_OBJECTS)
+# 	$(CC) $(CLIENT_CLI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
+#
+# $(CLIENT_TUI_NAME): $(CLIENT_TUI_OBJECTS)
+# 	$(CC) $(CLIENT_TUI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
+
+
+$(SERVER_BUILD_DIR)/%.o: $(SERVER_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+# $(CLIENT_CLI_BUILD_DIR)/%.o: $(CLIENT_CLI_DIR)/%.c
+# 	@mkdir -p $(dir $@)
+# 	$(CC) -c $< -o $@ $(CFLAGS)
+#
+# $(CLIENT_TUI_BUILD_DIR)/%.o: $(CLIENT_TUI_DIR)/%.c
+# 	@mkdir -p $(dir $@)
+# 	$(CC) -c $< -o $@ $(CFLAGS)
 
 install: all
-	sudo install -m755 $(BINS) $(INSTALL_PATH)
-
-uninstall:
-	sudo rm -f $(addprefix $(INSTALL_PATH)/,$(BINS))
+	sudo install -m755 $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME) $(INSTALL_PATH)
 
 clean:
-	rm -rf $(BINS) $(BUILD_DIR)
+	rm -rf $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME) $(BUILD_DIR)
+
+uninstall:
+	sudo rm -f $(INSTALL_PATH)/$(SERVER_NAME)
+	# sudo rm -f $(INSTALL_PATH)/$(CLIENT_CLI_NAME)
+	# sudo rm -f $(INSTALL_PATH)/$(CLIENT_TUI_NAME)
 
 .PHONY: all install uninstall clean

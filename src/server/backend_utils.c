@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
-#include "../libs/miniaudio.h"
+#include "../../libs/miniaudio.h"
 
 #include "backend.h"
 #include "backend_utils.h"

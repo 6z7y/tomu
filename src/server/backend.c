@@ -18,7 +18,7 @@
 #include "socket.h"
 #include "utils.h"
 
-#include "../libs/miniaudio.h"
+#include "../../libs/miniaudio.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
@@ -380,9 +380,9 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   ma_device_start(&device);
 
   // wait for all threads to finish.. (if only we could allow the main thread to have coffee during this..)
+  pthread_detach(control_thread);
+  pthread_detach(sock_thread);
   pthread_join(decoder_thread, NULL);
-  pthread_join(control_thread, NULL);
-  pthread_join(sock_thread, NULL);
 
   // 7. clean up
   ma_device_stop(&device);

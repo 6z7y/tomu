@@ -4,7 +4,7 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/dict.h>
-#include "../libs/miniaudio.h"
+#include "../../libs/miniaudio.h"
 
 #include "backend.h"
 

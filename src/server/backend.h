@@ -6,7 +6,7 @@
 #include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 #include <stdbool.h>
-#include "../libs/miniaudio.h"
+#include "../../libs/miniaudio.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
