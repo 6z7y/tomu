@@ -1,3 +1,9 @@
+# 6z7y 1.0.5_beta - 2026-03-01
+- Build unix socket server
+- Add tomucli (client cli)
+- Change playback control to socket commands
+- Send path from client to server
+- Add live status/progress bar in tomucli
 # A: 6z7y 1.0.4_beta - 2026-2-8
 - Removed server & socket
 - Added audio filter
