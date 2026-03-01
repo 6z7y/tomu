@@ -4,6 +4,7 @@ A lightweight audio player for Linux built in C. Tomu focuses on efficient memor
 
 ## Features
 
+- **Server/Client**: Server runs in background, music keeps playing even if you close the client
 - **Lightweight**: Minimal dependencies and low memory footprint
 - **Quality Audio**: use same quality audio if possible or use standard (for compatliblity)
 - **Format Support**: Plays any audio format supported by FFmpeg (MP3, FLAC, WAV, OGG, AAC, etc.)
@@ -73,7 +74,17 @@ Tomu uses a sophisticated multi-threaded architecture for smooth audio playback:
 
 ![Architecture Diagram](docs/diagram.png)
 
+1. Start the server: `tomu-server`
+2. Connect with client and play a file: `tomucli /path/to/music`
+3. Control playback with keys from any terminal
+
+The client sends commands and receives a live progress bar every second.
+Because the server runs separately, you can disconnect the client and the music keeps playing.
+
 **i made this tool for learn c and need music player less usage ram for i make many session this will take usage ram.**
-``
-this only beta not complete yet
-``
+
+`this only beta not complete yet`
+
+Binaries
+- tomu — background server, handles decoding and playback
+- tomucli — client CLI to control the server
