@@ -15,11 +15,11 @@ SERVER_SOURCES := $(wildcard $(SERVER_DIR)/*.c)
 SERVER_OBJECTS := $(patsubst $(SERVER_DIR)/%.c, $(SERVER_BUILD_DIR)/%.o, $(SERVER_SOURCES))
 
 # # cli (CLIENT)
-# CLIENT_CLI_NAME := tomucli
-# CLIENT_CLI_DIR := src/clients/cli
-# CLIENT_CLI_BUILD_DIR := $(BUILD_DIR)/clients/cli
-# CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
-# CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
+CLIENT_CLI_NAME := tomucli
+CLIENT_CLI_DIR := src/clients/cli
+CLIENT_CLI_BUILD_DIR := $(BUILD_DIR)/clients/cli
+CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
+CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
 #
 # # tui (CLIENT)
 # CLIENT_TUI_NAME := tomutui
@@ -36,8 +36,8 @@ all: $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME)
 $(SERVER_NAME): $(SERVER_OBJECTS)
 	$(CC) $(SERVER_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
 
-# $(CLIENT_CLI_NAME): $(CLIENT_CLI_OBJECTS) $(SERVER_OBJECTS)
-# 	$(CC) $(CLIENT_CLI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
+$(CLIENT_CLI_NAME): $(CLIENT_CLI_OBJECTS) $(SERVER_OBJECTS)
+	$(CC) $(CLIENT_CLI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
 #
 # $(CLIENT_TUI_NAME): $(CLIENT_TUI_OBJECTS)
 # 	$(CC) $(CLIENT_TUI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
@@ -47,9 +47,9 @@ $(SERVER_BUILD_DIR)/%.o: $(SERVER_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-# $(CLIENT_CLI_BUILD_DIR)/%.o: $(CLIENT_CLI_DIR)/%.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) -c $< -o $@ $(CFLAGS)
+$(CLIENT_CLI_BUILD_DIR)/%.o: $(CLIENT_CLI_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ $(CFLAGS)
 #
 # $(CLIENT_TUI_BUILD_DIR)/%.o: $(CLIENT_TUI_DIR)/%.c
 # 	@mkdir -p $(dir $@)
@@ -63,7 +63,7 @@ clean:
 
 uninstall:
 	sudo rm -f $(INSTALL_PATH)/$(SERVER_NAME)
-	# sudo rm -f $(INSTALL_PATH)/$(CLIENT_CLI_NAME)
+	sudo rm -f $(INSTALL_PATH)/$(CLIENT_CLI_NAME)
 	# sudo rm -f $(INSTALL_PATH)/$(CLIENT_TUI_NAME)
 
 .PHONY: all install uninstall clean
