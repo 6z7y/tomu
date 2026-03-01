@@ -74,7 +74,7 @@ Tomu uses a sophisticated multi-threaded architecture for smooth audio playback:
 
 ![Architecture Diagram](docs/diagram.png)
 
-1. Start the server: `tomu-server`
+1. Start the server: `tomu`
 2. Connect with client and play a file: `tomucli /path/to/music`
 3. Control playback with keys from any terminal
 
