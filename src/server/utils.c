@@ -2,127 +2,108 @@
 #include <libavcodec/codec.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <time.h>
 
 #include "backend.h"
 #include "backend_utils.h"
 #include "utils.h"
 
-uint KeepPlayingDirectory = 1;
-
-// defined here because of the extren
-dirFiles DirFiles = {
-  .DirLoopStop = true
+static const char *filter_formats[] = {
+  ".mp3", ".opus", ".flac", ".wav",
+  ".ogg", ".aac", ".wma", ".aiff",
+  ".m4a"
 };
-
-inline void help()
-{
-  printf(
-    "Usage: tomu [COMMAND] [PATH]\n"
-    " Commands:\n\n"
-
-    "   --loop            : loop same sound\n"
-    "   --version         : show version of program\n"
-    "   --help            : show help message\n"
-
-    "\nkeys:\n"
-    " (Space) = pause/resume\n"
-    " (Backspace) = reset playback speed\n"
-    " (q) = quit\n"
-    " (s) = shuffle toggle\n"
-    " (l) = loop toggle\n"
-    " (-) = decrease volume\n"
-    " (+) = increase volume\n"
-    " (↑/→) = audio seek forward +5s/1m\n"
-    " (←/↓) = audio seek backward -5s/1m\n"
-    " ([) = audio speed decrease\n"
-    " (]) = audio speed increase\n"
-    " (</>) = (Pervious/Next) audio\n"
-
-    "\nExample: tomu loop [FILE.mp3]\n"
-  );
-}
-
-int is_audio(const char *file)
-{
-    int len = strlen(file);
-
-    return 
-      !strcmp(file + len - 4, ".mp3") ||
-      !strcmp(file + len - 5, ".flac") ||
-      !strcmp(file + len - 5, ".opus") ||
-      !strcmp(file + len - 4, ".wav") ||
-      !strcmp(file + len - 4, ".ogg") ||
-      !strcmp(file + len - 4, ".aac") ||
-      !strcmp(file + len - 4, ".wma") ||
-      !strcmp(file + len - 5, ".aiff") ||
-      !strcmp(file + len - 5, ".m4a");
-}
 
 void cleanUP(){
   if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
   if (ctx.codecCTX ) avcodec_free_context(&ctx.codecCTX);
 }
 
-void path_handle(const char *path, unsigned int loop_mode, unsigned int shuffle_mode)
+int is_audio(const char *file)
 {
-    struct stat st;
-    if (stat(path, &st) < 0) {
-        die("File:");
-        return;
+    int len = strlen(file);
+    int limit = (sizeof(filter_formats) / sizeof(filter_formats[0]));
+
+    for (int i = 0; i < limit; i++){
+      int ext_len = strlen(filter_formats[i]);
+      if (!strcmp(file + len - ext_len, filter_formats[i]))
+        return 1; // is a file audio
     }
+    return 0; // it's not a file audio
+}
+
+void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_fmt_mode)
+{
+    Dir_File *dir = &ctx.dir;
+
+    struct stat st;
+    if (stat(path, &st) < 0) die("File:");
 
     // If path is a directory
     if (S_ISDIR(st.st_mode)) {
-        DirFiles.path = (char*)path;
-        DirFiles.files = extractDir(path); // assume this returns char** array
-        DirFiles.DirLoopStop = false;
+        dir->files = extractDir(path, dir); // assume this returns char** array
 
-        int currentFile = 0;
+        srand(time(NULL));
 
-        while (KeepPlayingDirectory || DirFiles.DirLoopStop) {
-            if (currentFile >= DirFiles.totalFiles) {
-                if (DirFiles.DirLoopStop)
-                    currentFile = 0; // loop
-                else
-                    break;
-            }
+        dir->currentFile = shuffle_mode ? rand() % dir->totalFiles : 0;
 
-            char filename[1024];
-            snprintf(filename, sizeof(filename), "%s/%s", DirFiles.path, DirFiles.files[currentFile]);
+        while (1){
+          if (dir->currentFile < 0) dir->currentFile = dir->totalFiles - 1;
+          if (dir->currentFile >= dir->totalFiles) dir->currentFile = 0;
 
-            // Skip non-audio files
+          char filename[1024];
+          snprintf(filename, sizeof(filename), "%s/%s", path, dir->files[dir->currentFile]);
+
+          // Skip non-audio files
+          if (!skip_fmt_mode){
             if (!is_audio(filename)) {
-                printf("%s is not audio, skipping\n", filename);
-                currentFile++;
-                continue;
+              printf("'%s' is not audio file, skipping\n", filename);
+              dir->currentFile++;
+              continue;
             }
+          }
 
-            // Play audio
-            playback_run(filename, loop_mode, shuffle_mode);
+          /* reset skip flag before playing */
+          ctx.state.skip_to_next = 1;
 
-            currentFile++; // move to next
+          // Play audio
+          playback_run(filename, loop_mode, shuffle_mode);
+
+          /* q was pressed — fully quit */
+          if (ctx.state.skip_to_next == 0) break;
+
+          /* next / prev / shuffle */
+          if (ctx.state.shuffle)
+              dir->currentFile = rand() % dir->totalFiles;
+          else
+              dir->currentFile += ctx.state.skip_to_next; /* +1 or -1 */
         }
 
         // Cleanup
-        for (int i = 0; i < DirFiles.totalFiles; i++)
-            free(DirFiles.files[i]);
-        free(DirFiles.files);
+        for (int i = 0; i < dir->totalFiles; i++)
+            free(dir->files[i]);
+        free(dir->files);
     }
 
     // If path is a regular file
     else if (S_ISREG(st.st_mode)) {
-        if (!is_audio(path)) {
-            printf("'%s' is not audio\n", path);
-            return;
+
+        if (!skip_fmt_mode){
+          if (!is_audio(path)) {
+              printf("'%s' is not audio file\n", path);
+              return;
+          }
         }
         playback_run(path, loop_mode, shuffle_mode);
     }
 
-    else {
-        die("File:");
-    }
+    else die("File:");
 }
+
+
 
 void verr(const char *fmt, va_list ap)
 {
@@ -140,14 +121,14 @@ void warn(const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 	verr(fmt, ap);
-	va_end(ap);
+  va_end(ap);
 }
 
 void die(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	verr(fmt, ap);
+  verr(fmt, ap);
 	va_end(ap);
 	exit(-1);
 }

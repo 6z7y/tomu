@@ -15,7 +15,6 @@
 #include "backend.h"
 #include "backend_utils.h"
 #include "control.h"
-#include "socket.h"
 #include "utils.h"
 
 #include "../../libs/miniaudio.h"
@@ -60,6 +59,12 @@ void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
   pthread_mutex_lock(&buf->lock);
   
   while (buf->filled == 0) {
+    // If decoder is done and buffer is empty → write silence, don't block
+    if (buf->stopped) {
+      memset(output, 0, bytes_needed);
+      pthread_mutex_unlock(&buf->lock);
+      return;
+    }
     pthread_cond_wait(&buf->data_ready, &buf->lock);
   }
   
@@ -120,6 +125,7 @@ void *run_decoder(void *arg)
 
   int64_t total_samples_played = 0;
   int duration_sec = fmtCTX->duration / 1000000;
+  ctx.state.duration = duration_sec;
   float last_speed = state->speed;
 
 decode:
@@ -135,7 +141,8 @@ decode:
       while (avcodec_receive_frame(codecCTX, frame) >= 0) {
         // show progress Display
         double current_time = (double)total_samples_played / inf->sample_rate;
-        progress(state, current_time, duration_sec);
+        ctx.state.position = (int)current_time;
+        // progress(state, current_time, duration_sec);
         total_samples_played += frame->nb_samples;
 
         pthread_mutex_lock(&state->lock);
@@ -147,6 +154,7 @@ decode:
             pthread_mutex_unlock(&state->lock);
             goto decode;
           }
+        pthread_mutex_unlock(&state->lock);
         
         // Handle speed change
         if (state->speed != last_speed) {
@@ -170,7 +178,9 @@ decode:
         pthread_mutex_lock(&state->lock);
         while (state->paused)
           pthread_cond_wait(&state->wait_cond, &state->lock);
-        progress(state, current_time, duration_sec);
+          
+        if (state->running == false) break;
+        // progress(state, current_time, duration_sec);
         pthread_mutex_unlock(&state->lock);
 
         // Process audio based on conversion needs
@@ -255,6 +265,12 @@ decode:
   state->running = 0;
   pthread_cond_broadcast(&state->wait_cond);
   pthread_mutex_unlock(&state->lock);
+
+  // Signal buffer: no more data coming — unblocks ma_dataCallback
+  pthread_mutex_lock(&ctx.buf->lock);
+  ctx.buf->stopped = 1;
+  pthread_cond_broadcast(&ctx.buf->data_ready);
+  pthread_mutex_unlock(&ctx.buf->lock);
   
   if (swrCTX) swr_free(&swrCTX);
   if (speed_swrCTX) swr_free(&speed_swrCTX);
@@ -269,20 +285,13 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
   Audio_Info *inf = &ctx.inf;
   Audio_State *state = &ctx.state;
   
-  // Read audio data
   int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
   audio_buffer_read(ctx.buf, output, bytes);
 
-  // check if paused
-  pthread_mutex_lock(&state->lock);
-
-    while (state->paused)
-      pthread_cond_wait(&state->wait_cond, &state->lock);
-
   // Apply volume
+  pthread_mutex_lock(&state->lock);
   if (state->volume != 1.00f)
     ma_apply_volume_factor_pcm_frames(output, frameCount, inf->ma_fmt, inf->ch, state->volume);
-
   pthread_mutex_unlock(&state->lock);
 }
 
@@ -343,25 +352,20 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 
   // 2. initialize a buffer, size = 500ms
   int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.5;
-
   ctx.buf = audio_buffer_init(capacity); // initialize buffer
 
-  // 4. init miniaudio device (for sending PCM samples to speaker)
+  // 3. init miniaudio device
   ma_device device;
   ma_device_config ma_config = init_miniaudioConfig(&ctx.inf);
 
-  // 4.1 initialize the device output
-  if (ma_device_init(NULL, &ma_config, &device) != MA_SUCCESS ){
-    audio_buffer_destroy(ctx.buf);
-    pthread_mutex_destroy(&ctx.state.lock);
-    pthread_cond_destroy(&ctx.state.wait_cond);
-    cleanUP();
-    die("miniaudio: something happend when initialize device output");
-  }
+  // 4. initialize the device output
+  if (ma_device_init(NULL, &ma_config, &device) != MA_SUCCESS ) goto clean_every;
 
-  // 5. Display Outputs
-  // progress output inside decoder must be there
+  // 5. Initialize playback status
   init_playbackstatus(&ctx.state, loop_mode, shuffle_mode);
+
+  // 6. NOW mark as ready! (after all initialization)
+  ctx.state.ready = 1;
 
   if (ctx.fmtCTX->metadata)
     print_metadata(ctx.fmtCTX->metadata);
@@ -369,27 +373,24 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   printf("Playing: %s\n",  filename);
   printf("%.2dHz, %dch, %s\n", ctx.inf.sample_rate, ctx.inf.ch, av_get_sample_fmt_name(ctx.inf.sample_fmt));
 
-  // 6 start threads
-  pthread_t control_thread, sock_thread, decoder_thread;
-
-  pthread_create(&control_thread, NULL, handle_input, &ctx.state); // terminal controls
-  pthread_create(&sock_thread, NULL, run_socket, &ctx.state); // socket controls
-  pthread_create(&decoder_thread, NULL, run_decoder, NULL); // decoder ._. 
+  // 7. start threads
+  pthread_t decoder_thread;
+  pthread_create(&decoder_thread, NULL, run_decoder, NULL);
   
   // Start audio playback device
   ma_device_start(&device);
 
-  // wait for all threads to finish.. (if only we could allow the main thread to have coffee during this..)
-  pthread_detach(control_thread);
-  pthread_detach(sock_thread);
   pthread_join(decoder_thread, NULL);
 
-  // 7. clean up
+clean_every:
   ma_device_stop(&device);
   ma_device_uninit(&device);
   audio_buffer_destroy(ctx.buf);
+  ctx.buf = NULL;
   pthread_mutex_destroy(&ctx.state.lock);
   pthread_cond_destroy(&ctx.state.wait_cond);
   cleanUP();
+  // Zero out per-song state so next song starts clean
+  memset(&ctx.inf, 0, sizeof(ctx.inf));
   return 0;
 }

@@ -28,18 +28,14 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played);
 void print_metadata(AVDictionary *metadata);
 void progress(Audio_State *state, double current_time, int duration_time);
 
-char** extractDir(const char* path);
+int get_sec(double value);
 
-static inline int get_sec(double value){
-  return (int)value % 60;
-}
+int get_min(double value);
 
-static inline int get_min(double value){
-  return ((int)value % 3600) / 60;
-}
+int get_hour(double value);
 
-static inline int get_hour(double value){
-  return (int)value / 3600;
-}
+char **extractDir(const char* path, Dir_File *dir);
+// void extractDir(const char* path);
+
 
 #endif

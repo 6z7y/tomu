@@ -131,9 +131,13 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   state->volume = 1.00f;
   state->speed = 1.00f;
   state->looping = loop;
+  state->shuffle = shuffle;
+  // state->skip_to_next = 0;
 
   state->seek_request = 0;
   state->seek_target = 0;
+
+  state->ready = 0;  // ← Not ready until file is loaded
 
   pthread_mutex_init(&state->lock, NULL);
   pthread_cond_init(&state->wait_cond, NULL);
@@ -169,9 +173,10 @@ Audio_Buffer *audio_buffer_init(int capacity)
 
   buf->pcm_data = malloc(capacity);
   buf->capacity = capacity;
-  buf->write_pos = 0;     // Start writing at beginning
-  buf->read_pos = 0;      // Start reading from beginning
-  buf->filled = 0;        // Buffer starts empty
+  buf->write_pos = 0;
+  buf->read_pos = 0;
+  buf->filled = 0;
+  buf->stopped = 0;
 
   pthread_mutex_init(&buf->lock, NULL);
   pthread_cond_init(&buf->data_ready, NULL);
@@ -240,72 +245,79 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   return;
 }
 
-inline void progress(Audio_State *state, double current_time, int duration_time)
+void progress(Audio_State *state, double current_time, int duration_time)
 {
-  int bar_width = 30;
+  if (duration_time == 0) return;
 
+  int bar_width = 30;
   int pos = (current_time / duration_time) * bar_width;
 
-  printf("\0337");
-  printf("\033[0J");
-  printf("\r%s[", ctx.state.paused ? " (Paused) " : "");
-  for (int i = 0; i < bar_width; i++){
+  int cur_m = get_min(current_time);
+  int cur_s = get_sec(current_time);
+  int dur_m = get_min(duration_time);
+  int dur_s = get_sec(duration_time);
 
-    if (i < pos)
-      printf("=");
-
-    else if (i == pos)
-      printf(">");
-
-    else
-      printf(".");
+  printf("\r%s[", state->paused ? "(Paused) " : "");
+  for (int i = 0; i < bar_width; i++) {
+    if      (i < pos)  printf("=");
+    else if (i == pos) printf(">");
+    else               printf(".");
   }
-
-    printf("] %d:%02d:%02d / %d:%02d:%02d (~%.00f%%) | %.2fx v: %.0f%%, s:%d, l:%d\r",
-    get_hour(current_time), get_min(current_time), get_sec(current_time), 
-    get_hour(duration_time), get_min(duration_time), get_sec(duration_time),
-    (current_time / duration_time) * 100.0, state->speed,
-    state->volume * 100.0f, state->shuffle, state->looping
-  );
-  printf("\0338");
-
+  printf("] %02d:%02d/%02d:%02d vol:%.0f%% speed:%.2fx",
+         cur_m, cur_s, dur_m, dur_s,
+         state->volume * 100, state->speed);
   fflush(stdout);
 }
 
+int get_sec(double value){
+  return (int)value % 60;
+}
+
+int get_min(double value){
+  return ((int)value % 3600) / 60;
+}
+
+int get_hour(double value){
+  return (int)value / 3600;
+}
+
 // Read all the files in dir and return them 
-char** extractDir(const char* path){
+char **extractDir(const char* path, Dir_File *dir)
+{
   // why do i realloc ? because i want O(n) 
   // its better than count then add all the files it will be O(n^2)
 
   // TODO make it only extract audio files
   // TODO if there isn't any file close the program 
 
-  DIR *dir = opendir(path);
-  int capacity = 10;
-  char **files = malloc(capacity * sizeof(char*));
+  struct dirent* dirent_file;
+  DIR *pwd = opendir(path);
+  int count_files = 0;
+  char **files = NULL;
 
-  struct dirent* entry;
-  while ((entry = readdir(dir)) != NULL) {
+  while ((dirent_file = readdir(pwd)) != NULL) {
 
-    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) // remove (".", "..")
-      continue;
+    if ((!strcmp(dirent_file->d_name, ".")) || (!strcmp(dirent_file->d_name, ".."))) continue; // remove (".", "..")
 
     // Grow array if needed
-    if (DirFiles.totalFiles == capacity) {
-      capacity *= 2;
-      char **tmp = realloc(files, capacity * sizeof(char *));
-      if (!tmp) {
-        // cleanup on failure
-        for (int i = 0; i < DirFiles.totalFiles; i++)
-          free(files[i]);
-        free(files);
-        closedir(dir);
-        return NULL;
-      }
-      files = tmp;
+    files = realloc(files, sizeof(char *) * (count_files + 1));
+    if (!files) goto clean_files;
 
-    }
-    files[DirFiles.totalFiles++] = strdup(entry->d_name);
+    files[count_files] = strdup(dirent_file->d_name);
+    count_files++;
   }
+  closedir(pwd);
+
+  dir->totalFiles = count_files;
   return files;
+
+clean_files:
+  // cleanup on failure
+  closedir(pwd);
+  for (int i = 0; i < count_files; i++)
+    free(files[i]);
+  free(files);
+  printf("Debug: Bye from extractdir");
+  exit(1);
 }
+
