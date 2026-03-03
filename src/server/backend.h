@@ -11,6 +11,18 @@
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
+
+typedef struct {
+    int   duration;
+    int   position;
+    int   paused;
+    float volume;
+    float speed;
+    int   shuffle;
+    int   loop;
+    // int   playing;
+} TomuStatus;
+
 // struct handle Playback
 typedef struct {
   int running;
@@ -81,8 +93,7 @@ typedef struct PlayBackContext{
 
 extern PlayBackContext ctx;
 
-
-int playback_run(const char *filename, uint loop_mode, uint shuffle_mode);
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount);
+int playback_run(const char *filename, uint loop_mode, uint shuffle_mode);
 
 #endif

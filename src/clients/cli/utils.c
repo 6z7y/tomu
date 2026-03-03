@@ -1,16 +1,36 @@
 #include "utils.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+#include "../share_clients.h"
+#include "../../share_info.h"
 
 void clean_with_bye(int socket, int mode)
 {
-  close(socket);
   termios_mode(0);
-
-  exit(mode);
 }
+
+void socket_mode(int mode, int *server_fd)
+{
+  if (mode) {
+    // 1. create socket
+    struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
+    *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (*server_fd < 0) die("Socket:");
+
+    // 2. Connect socket
+    if (connect(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+      die("Connect failed, make sure server running");
+  }
+
+  else {
+    close(*server_fd);
+  }
+}
+
 
 // change mode terminal 1=on, 0=off
 void termios_mode(int mode)

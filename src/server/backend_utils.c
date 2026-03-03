@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
-#include "../../libs/miniaudio.h"
+#include <unistd.h>
 
+#include "../../libs/miniaudio.h"
 #include "backend.h"
 #include "backend_utils.h"
+#include "control.h"
 
 // function take from planar_value to get interleaved_value
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
@@ -130,8 +132,8 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   state->paused = 0;
   state->volume = 1.00f;
   state->speed = 1.00f;
-  state->looping = loop;
-  state->shuffle = shuffle;
+  state->looping = 0;
+  state->shuffle = 1;
   // state->skip_to_next = 0;
 
   state->seek_request = 0;
@@ -245,41 +247,31 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   return;
 }
 
-void progress(Audio_State *state, double current_time, int duration_time)
-{
-  if (duration_time == 0) return;
+// void progress(Audio_State *state, double current_time, int duration_time)
+// {
+//   if (duration_time == 0) return;
+//
+//   int bar_width = 30;
+//   int pos = (current_time / duration_time) * bar_width;
+//
+//   int cur_m = get_min(current_time);
+//   int cur_s = get_sec(current_time);
+//   int dur_m = get_min(duration_time);
+//   int dur_s = get_sec(duration_time);
+//
+//   printf("\r%s[", state->paused ? "(Paused) " : "");
+//   for (int i = 0; i < bar_width; i++) {
+//     if      (i < pos)  printf("=");
+//     else if (i == pos) printf(">");
+//     else               printf(".");
+//   }
+//   printf("] %02d:%02d/%02d:%02d vol:%.0f%% speed:%.2fx",
+//          cur_m, cur_s, dur_m, dur_s,
+//          state->volume * 100, state->speed);
+//   fflush(stdout);
+// }
 
-  int bar_width = 30;
-  int pos = (current_time / duration_time) * bar_width;
 
-  int cur_m = get_min(current_time);
-  int cur_s = get_sec(current_time);
-  int dur_m = get_min(duration_time);
-  int dur_s = get_sec(duration_time);
-
-  printf("\r%s[", state->paused ? "(Paused) " : "");
-  for (int i = 0; i < bar_width; i++) {
-    if      (i < pos)  printf("=");
-    else if (i == pos) printf(">");
-    else               printf(".");
-  }
-  printf("] %02d:%02d/%02d:%02d vol:%.0f%% speed:%.2fx",
-         cur_m, cur_s, dur_m, dur_s,
-         state->volume * 100, state->speed);
-  fflush(stdout);
-}
-
-int get_sec(double value){
-  return (int)value % 60;
-}
-
-int get_min(double value){
-  return ((int)value % 3600) / 60;
-}
-
-int get_hour(double value){
-  return (int)value / 3600;
-}
 
 // Read all the files in dir and return them 
 char **extractDir(const char* path, Dir_File *dir)

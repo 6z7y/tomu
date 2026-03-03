@@ -4,75 +4,85 @@
 #include <sys/un.h>
 #include <termios.h>
 #include <poll.h>
+#include "backend.h"
 #include "control.h"
 #include "utils.h"
-#include "../../share.h"
-#include "../share-clients.h"
+#include <errno.h>
+
+#include "../../share_info.h"
+#include "../share_clients.h"
+
+void init_socket(int *server_fd)
+{
+  // 1. create socket
+  struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
+  *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (*server_fd < 0) die("Socket:");
+
+  // 2. Connect socket
+  if (connect(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+    die("Connect failed, make sure server running");
+}
 
 int main(int argc, char **argv)
 {
-  // See what the user wants with "--" and handle it
-  if ( argv[1][0] == '-' && argv[1][1] == '-' ){
+  int server_fd;
 
-    if ( strcmp(argv[1], "--help") == 0 )
-      help();
+  // 1. connect to server
+  socket_mode(1, &server_fd);
 
-    else if ( strcmp(argv[1], "--version") == 0 )
-      printf("Tomu: %s\n", CLIENT_CLI_VER);
+  // 2. enter raw terminal
+  termios_mode(1);
 
-    else 
-      printf("[T]: unknown option '%s'\n", argv[1]);
-
-    return 0;
-  }
-
-  // 1. create socket
-  struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
-  int serverfd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (serverfd < 0) die("Socket:");
-
-  // 2. Connect socket
-  if (connect(serverfd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-    die("Connect failed, make sure server running");
+  // in client main.c, after socket_mode(1, &server_fd):
+  ClientType my_type = CLIENT_CLI;  // or TUI/GUI depending on which client
+  write(server_fd, &my_type, sizeof(ClientType));
 
   // 3. if path given, send it to server
   if (argc > 1)
-    send_path(serverfd, argv[argc - 1]);
+    send_path(server_fd, argv[argc - 1]);
 
-  // 4. enter termios mode
-  termios_mode(1);
+  // Audio_State state = {0};
+  TomuStatus status = {0};
 
-  // 5. init poll
+  // 4. init poll
   struct pollfd fds[2];
-  fds[0].fd = serverfd;
-  fds[0].events = POLLIN;
-  fds[1].fd = STDIN_FILENO;
-  fds[1].events = POLLIN;
+  fds[0] = (struct pollfd){ server_fd, POLLIN };
+  fds[1] = (struct pollfd){ STDIN_FILENO, POLLIN };
 
+  // for store thing
   char key[8];
   char buf[256];
 
   // 6. main loop
   while(1) {
-    int ret = poll(fds, 2, 1000);
+    int ret = poll(fds, 2, -1);
     if (ret <= 0) { continue; }
 
     if (fds[0].revents & POLLIN) {
-      int n = read(serverfd, buf, sizeof(buf) - 1);
-      if (n > 0) {
-        buf[n] = '\0';
-        printf("\r%s", buf);
-        fflush(stdout);
-      }
-      else if (n <= 0) { perror("Server disconnected"); break; }
+        TomuStatus tmp;
+        int n;
+        // drain all pending statuses, keep the last one
+        while ((n = read(server_fd, &tmp, sizeof(tmp))) == (int)sizeof(tmp)) {
+            status = tmp;
+            // check if more data waiting
+            struct pollfd pfd = { server_fd, POLLIN, 0 };
+            if (poll(&pfd, 1, 0) <= 0) break;  // no more data, stop
+        }
+        if (n == 0 || (n < 0 && errno != EAGAIN)) {
+            fprintf(stderr, "Server disconnected\n");
+            break;
+        }
+        progress(&status, status.position, status.duration);
     }
 
     if (fds[1].revents & POLLIN) {
       int n = read(STDIN_FILENO, key, sizeof(key) - 1);
       key[n] = '\0';
-      handle_control(serverfd, key);
+      handle_control(server_fd, key);
     }
   }
 
-  clean_with_bye(serverfd, 0);
+  termios_mode(0);
+  socket_mode(0, &server_fd);
 }

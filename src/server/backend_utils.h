@@ -7,6 +7,8 @@
 #include "../../libs/miniaudio.h"
 
 #include "backend.h"
+#include "control.h"
+#include "../share_info.h"
 
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value);
 ma_format get_ma_format(enum AVSampleFormat value);
@@ -26,13 +28,8 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle);
 
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played);
 void print_metadata(AVDictionary *metadata);
-void progress(Audio_State *state, double current_time, int duration_time);
+// void progress(Audio_State *state, double current_time, int duration_time);
 
-int get_sec(double value);
-
-int get_min(double value);
-
-int get_hour(double value);
 
 char **extractDir(const char* path, Dir_File *dir);
 // void extractDir(const char* path);

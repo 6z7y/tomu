@@ -370,8 +370,8 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   if (ctx.fmtCTX->metadata)
     print_metadata(ctx.fmtCTX->metadata);
 
-  printf("Playing: %s\n",  filename);
-  printf("%.2dHz, %dch, %s\n", ctx.inf.sample_rate, ctx.inf.ch, av_get_sample_fmt_name(ctx.inf.sample_fmt));
+  // printf("Playing: %s\n",  filename);
+  // printf("%.2dHz, %dch, %s\n", ctx.inf.sample_rate, ctx.inf.ch, av_get_sample_fmt_name(ctx.inf.sample_fmt));
 
   // 7. start threads
   pthread_t decoder_thread;

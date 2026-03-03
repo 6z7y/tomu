@@ -8,6 +8,12 @@
 #include <string.h>
 
 typedef enum {
+    CLIENT_CLI,
+    CLIENT_TUI,
+    CLIENT_GUI,
+} ClientType;
+
+typedef enum {
   CMD_PLAY_TOGGLE,
   CMD_STOP,
   CMD_NEXT_AUDIO,
@@ -33,18 +39,37 @@ typedef struct {
 } KeyMap;
 
 
-typedef struct {
-    int   duration;
-    int   position;
-    int   paused;
-    float volume;
-    float speed;
-    int   shuffle;
-    int   loop;
-    int   playing;
-    char  current_file[256];
-} TomuStatus;
+// // struct handle Playback
+// typedef struct {
+//   int running;
+//   int paused;
+//   int duration;
+//   int position;  // add this
+//   int skip_to_next;
+//   float volume;
+//   float speed;
+//   uint looping;
+//   uint shuffle;
+//   int seek_request; // Flag: 1 = seek needed
+//   int64_t seek_target; // Where seek to (in microseconds)
+//   int ready;  // ← ADD THIS: indicates playback is ready
+//   pthread_mutex_t lock;
+//   pthread_cond_t wait_cond;
+//
+// } Audio_State;
 
+
+static inline int get_sec(double value){
+  return (int)value % 60;
+}
+
+static inline int get_min(double value){
+  return ((int)value % 3600) / 60;
+}
+
+static inline int get_hour(double value){
+  return (int)value / 3600;
+}
 
 
 static inline  void verr(const char *fmt, va_list ap)

@@ -1,9 +1,15 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
+#include <poll.h>
+
 #include "backend.h"
-#define SOCKET_PATH "/tmp/tomu-sock"
-#define MAX_CLIENT 6
+
+typedef enum {
+    CLIENT_CLI,
+    CLIENT_TUI,
+    CLIENT_GUI,
+} ClientType;
 
 typedef enum {
   CMD_PLAY_TOGGLE,
@@ -25,22 +31,16 @@ typedef enum {
 } Command;
 
 typedef struct {
-    int   duration;
-    int   position;
-    int   paused;
-    float volume;
-    float speed;
-    int   shuffle;
-    int   loop;
-    int   playing;
-    char  current_file[256];
-} TomuStatus;
+  int fd;
+  int active;
+  struct pollfd pfd;
+  ClientType type;
+} Client_connection;
+
 
 void handle_key(Command cmd, Audio_State *state);
 
 void playback_toggle(Audio_State *state);
-void playback_pause(Audio_State *state);
-void playback_resume(Audio_State *state);
 void playback_stop(Audio_State *state);
 
 

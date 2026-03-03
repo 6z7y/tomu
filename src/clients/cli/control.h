@@ -1,7 +1,7 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
-#include "../share-clients.h"
+#include "../share_clients.h"
 
 void handle_control(int sock, const char *key);
 void send_cmd(int sock, Command cmd);

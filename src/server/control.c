@@ -48,18 +48,16 @@ void handle_key(Command cmd, Audio_State *state)
 // control playback (stop/resume/stop)
 // functions for playback
 // fn toggle pause/resume
-inline void playback_toggle(Audio_State *state)
+void playback_toggle(Audio_State *state)
 {
     pthread_mutex_lock(&state->lock);
-    if (state->paused == false) state->paused = 1;
-
-    else                      state->paused = 0;
+      state->paused = !state->paused;
     pthread_cond_broadcast(&state->wait_cond);
     pthread_mutex_unlock(&state->lock);
 }
 
 // Stops playback and wakes any waiting threads
-inline void playback_stop(Audio_State *state){
+void playback_stop(Audio_State *state){
   pthread_mutex_lock(&state->lock);
     // state->paused = 0;
     state->skip_to_next = 0;
@@ -170,34 +168,26 @@ inline void volume_decrease(Audio_State *state){
 // loop toggle
 inline void loop_toggle(Audio_State *state){
   pthread_mutex_lock(&state->lock);
-
-    if (state->looping == false) state->looping = true;
-
-    else                       state->looping = false;
-
+    state->looping = !state->looping;
   pthread_cond_broadcast(&state->wait_cond);
   pthread_mutex_unlock(&state->lock);
 }
 
 // shuffle toggle
 void shuffle_toggle(Audio_State *state) {
-    pthread_mutex_lock(&state->lock);
-
-      if (state->shuffle == false) state->shuffle = true;
-
-      else                       state->shuffle = false;
-
-    pthread_cond_broadcast(&state->wait_cond);
-    pthread_mutex_unlock(&state->lock);
+  pthread_mutex_lock(&state->lock);
+    state->shuffle = !state->shuffle;
+  pthread_cond_broadcast(&state->wait_cond);
+  pthread_mutex_unlock(&state->lock);
 }
 
 // prev/next playback
 inline void playback_next_audio(Audio_State *state){
-    pthread_mutex_lock(&state->lock);
-      state->skip_to_next = 1;
-      state->running = 0;
-      pthread_cond_broadcast(&state->wait_cond);
-    pthread_mutex_unlock(&state->lock);
+  pthread_mutex_lock(&state->lock);
+    state->skip_to_next = 1;
+    state->running = 0;
+    pthread_cond_broadcast(&state->wait_cond);
+  pthread_mutex_unlock(&state->lock);
 }
 
 inline void playback_prev_audio(Audio_State *state){

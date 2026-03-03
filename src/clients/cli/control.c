@@ -4,7 +4,7 @@
 
 #include "control.h"
 #include "utils.h"
-#include "../share-clients.h"
+#include "../share_clients.h"
 
 static const KeyMap keymap[] = {
 //    KEY             EXEC
@@ -63,17 +63,17 @@ void send_path(int sock, const char *path)
 
 // In handle_control(), add key "p" → ask for path:
 
-void path_change(int sock, const char *key)
-{
-  if (!strcmp(key, "p")) {
-    termios_mode(0);          // back to normal mode so user can type
-    char path[1024];
-    printf("Path: ");
-    fgets(path, sizeof(path), stdin);
-    path[strcspn(path, "\n")] = 0;  // remove newline
-    send_path(sock, path);
-    termios_mode(1);          // back to raw mode
-    return;
-
-  }
-}
+// void path_change(int sock, const char *key)
+// {
+//   if (!strcmp(key, "p")) {
+//     termios_mode(0);          // back to normal mode so user can type
+//     char path[1024];
+//     printf("Path: ");
+//     fgets(path, sizeof(path), stdin);
+//     path[strcspn(path, "\n")] = 0;  // remove newline
+//     send_path(sock, path);
+//     termios_mode(1);          // back to raw mode
+//     return;
+//
+//   }
+// }

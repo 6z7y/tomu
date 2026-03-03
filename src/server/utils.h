@@ -4,7 +4,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
-#include "../share.h"
+#include "../share_info.h"
 
 #define false 0
 #define true 1

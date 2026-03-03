@@ -11,5 +11,6 @@
 
 // path socket
 #define SOCKET_PATH "/tmp/tomu-sock"
+#define MAX_CLIENT 6
 
 #endif
