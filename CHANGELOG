@@ -1,4 +1,10 @@
-# 6z7y 1.0.5.1_beta - 2026-03-03
+# 6z7y 1.0.5_2_beta - 2026-03-06
+- add struct to store metadata (not used yet)
+- improve source structure
+- move audio data structs to audio_data.h
+- fix some issues
+
+# 6z7y 1.0.5_1_beta - 2026-03-03
 - fix progress bugs
 - fix server crash on client disconnect  
 - fix decoder freeze when client disconnects while paused
