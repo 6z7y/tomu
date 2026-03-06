@@ -38,27 +38,6 @@ typedef struct {
   Command cmd;
 } KeyMap;
 
-
-// // struct handle Playback
-// typedef struct {
-//   int running;
-//   int paused;
-//   int duration;
-//   int position;  // add this
-//   int skip_to_next;
-//   float volume;
-//   float speed;
-//   uint looping;
-//   uint shuffle;
-//   int seek_request; // Flag: 1 = seek needed
-//   int64_t seek_target; // Where seek to (in microseconds)
-//   int ready;  // ← ADD THIS: indicates playback is ready
-//   pthread_mutex_t lock;
-//   pthread_cond_t wait_cond;
-//
-// } Audio_State;
-
-
 static inline int get_sec(double value){
   return (int)value % 60;
 }
@@ -72,32 +51,8 @@ static inline int get_hour(double value){
 }
 
 
-static inline  void verr(const char *fmt, va_list ap)
-{
-	vfprintf(stderr, fmt, ap);
-	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
-		fputc(' ', stderr);
-		perror(NULL);
-	} else {
-		fputc('\n', stderr);
-	}
-}
-
-static inline  void warn(const char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	verr(fmt, ap);
-  va_end(ap);
-}
-
-static inline void die(const char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-  verr(fmt, ap);
-	va_end(ap);
-	exit(-1);
-}
+// void verr(const char *fmt, va_list ap);
+// void warn(const char *fmt, ...);
+// void die(const char *fmt, ...);
 
 #endif
