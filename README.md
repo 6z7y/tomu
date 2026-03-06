@@ -63,11 +63,6 @@ nix profile install .
 nix profile remove tomu
 ```
 
-### Basic Playback
-```bash
-tomu /path/to/audio.mp3
-```
-
 ## How It Works
 
 Tomu uses a sophisticated multi-threaded architecture for smooth audio playback:
