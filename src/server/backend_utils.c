@@ -1,14 +1,14 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-#include <stdio.h>
+#include <libavutil/avutil.h>
 #include <dirent.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "audio_data.h"
 #include "../../libs/miniaudio.h"
 #include "backend.h"
 #include "backend_utils.h"
-#include "control.h"
 
 // function take from planar_value to get interleaved_value
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
@@ -39,11 +39,11 @@ ma_format get_ma_format(enum AVSampleFormat value)
 }
 
 // fn to search correct stream you want
-int get_stream(int type)
+int get_audio_stream()
 {
   for (int i = 0; i < ctx.fmtCTX->nb_streams; i++){
     AVStream *stream = ctx.fmtCTX->streams[i];
-    if (stream->codecpar->codec_type == type )
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO )
       return i;
   }
   return -1;
@@ -145,15 +145,24 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   pthread_cond_init(&state->wait_cond, NULL);
 }
 
-void print_metadata(AVDictionary *metadata)
-{
-  AVDictionaryEntry *tag = NULL;
-
-  printf("File tags:\n");
-  while ((tag = av_dict_get(metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    printf("  %s : %s\n", tag->key, tag->value);
-  }
-}
+// void get_metadata()
+// {
+//   Audio_Metadata *metadata = &ctx.metadata;
+//
+//   AVDictionaryEntry *tag = NULL;
+//
+//   // printf("File tags:\n");
+//   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+//     // printf("  %s : %s\n", tag->key, tag->value);
+//   if      (!strcmp(tag->key, "title")) metadata->title = tag->value;
+//   else if (!strcmp(tag->key, "artist")) metadata->artist = tag->value;
+//   else if (!strcmp(tag->key, "album")) metadata->album = tag->value;
+//   else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = tag->value;
+//   else if (!strcmp(tag->key, "genre")) metadata->genre = tag->value;
+//   else if (!strcmp(tag->key, "date")) metadata->date = tag->value;
+//   else if (!strcmp(tag->key, "track")) metadata->track = tag->value;
+//   }
+// }
 
 // init miniaudio config before using
 ma_device_config init_miniaudioConfig(Audio_Info *inf)
@@ -280,7 +289,7 @@ char **extractDir(const char* path, Dir_File *dir)
   // its better than count then add all the files it will be O(n^2)
 
   // TODO make it only extract audio files
-  // TODO if there isn't any file close the program 
+  // TODO if there are no audio files, warn and return
 
   struct dirent* dirent_file;
   DIR *pwd = opendir(path);
@@ -308,8 +317,8 @@ clean_files:
   closedir(pwd);
   for (int i = 0; i < count_files; i++)
     free(files[i]);
-  free(files);
-  printf("Debug: Bye from extractdir");
-  exit(1);
-}
 
+  free(files);
+  warn("not there files!");
+  return NULL;
+}

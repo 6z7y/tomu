@@ -3,13 +3,20 @@
 
 #include <poll.h>
 
-#include "backend.h"
+#include "audio_data.h"
 
 typedef enum {
     CLIENT_CLI,
     CLIENT_TUI,
     CLIENT_GUI,
 } ClientType;
+
+typedef struct {
+  int fd;
+  int active;
+  struct pollfd pfd;
+  ClientType type;
+} Client_connection;
 
 typedef enum {
   CMD_PLAY_TOGGLE,
@@ -30,19 +37,11 @@ typedef enum {
   CMD_PATH,
 } Command;
 
-typedef struct {
-  int fd;
-  int active;
-  struct pollfd pfd;
-  ClientType type;
-} Client_connection;
-
 
 void handle_key(Command cmd, Audio_State *state);
 
 void playback_toggle(Audio_State *state);
 void playback_stop(Audio_State *state);
-
 
 void seek_forward_sec(Audio_State *state);
 void seek_forward_min(Audio_State *state);
@@ -56,15 +55,8 @@ void playback_speed_decrease(Audio_State *state);
 void volume_increase(Audio_State *state);
 void volume_decrease(Audio_State *state);
 
-void do_shuffle();
-void stopAndShuffle(Audio_State* state);
 void shuffle_toggle(Audio_State *state);
-void shuffle_true(Audio_State *state);
-void shuffle_false(Audio_State *state);
-
 void loop_toggle(Audio_State *state);
-void loop_true(Audio_State *state);
-void loop_false(Audio_State *state);
 
 void playback_next_audio(Audio_State *state);
 void playback_prev_audio(Audio_State *state);

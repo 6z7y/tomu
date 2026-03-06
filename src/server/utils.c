@@ -6,10 +6,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #include "backend.h"
 #include "backend_utils.h"
 #include "utils.h"
+#include "socket_utils.h"
+#include "../shared/share_info.h"
 
 static const char *filter_formats[] = {
   ".mp3", ".opus", ".flac", ".wav",
@@ -21,6 +25,14 @@ void cleanUP(){
   if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
   if (ctx.codecCTX ) avcodec_free_context(&ctx.codecCTX);
 }
+
+void sig_clean()
+{
+  cleanUP();
+  socket_mode(0, &ctx.server_fd);
+  exit(0);
+}
+
 
 int is_audio(const char *file)
 {
@@ -40,15 +52,17 @@ void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_
     Dir_File *dir = &ctx.dir;
 
     struct stat st;
-    if (stat(path, &st) < 0) die("File:");
+    if (stat(path, &st) < 0) { warn("File:"); return; }
 
     // If path is a directory
     if (S_ISDIR(st.st_mode)) {
-        dir->files = extractDir(path, dir); // assume this returns char** array
+        if (!(dir->files = extractDir(path, dir))) return; // assume this returns char** array
 
         srand(time(NULL));
 
         dir->currentFile = shuffle_mode ? rand() % dir->totalFiles : 0;
+
+        int counter_try = 0;
 
         while (1){
           if (dir->currentFile < 0) dir->currentFile = dir->totalFiles - 1;
@@ -59,9 +73,14 @@ void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_
 
           // Skip non-audio files
           if (!skip_fmt_mode){
+            if (counter_try >= 7) {
+              warn("is not there audio files!\n");
+              break;
+            }
             if (!is_audio(filename)) {
               printf("'%s' is not audio file, skipping\n", filename);
               dir->currentFile++;
+              counter_try++;
               continue;
             }
           }
@@ -100,10 +119,28 @@ void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_
         playback_run(path, loop_mode, shuffle_mode);
     }
 
-    else die("File:");
+    else warn("File:");
 }
 
+// handle command-line arguments
+int args_handle(char **argv)
+{
+  char *option = argv[1];
+  if (!option) return 0; // no arguments given, continue normally
 
+  if (option[0] == '-' && option[1] == '-') {
+    if (!strcmp(argv[1], "--version")) printf("Tomu: %s\n", SERVER_VER);
+
+    // TODO: add --help
+
+    else warn("[T]: unknown option '%s'", option);
+  }
+  else {
+    warn("[T]: unknown option '%s'", option);
+  }
+
+  return 1;
+}
 
 void verr(const char *fmt, va_list ap)
 {

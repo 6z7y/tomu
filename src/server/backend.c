@@ -1,7 +1,5 @@
-#include <libavcodec/packet.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-#include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 #include <libavutil/avutil.h>
 #include <stdlib.h>
@@ -12,9 +10,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "audio_data.h"
 #include "backend.h"
 #include "backend_utils.h"
-#include "control.h"
 #include "utils.h"
 
 #include "../../libs/miniaudio.h"
@@ -131,7 +129,7 @@ void *run_decoder(void *arg)
 decode:
   while (av_read_frame(fmtCTX, packet) >= 0) {
 
-    // only procces audio packets
+    // only process audio packets
     if ( packet->stream_index == inf->audioStream_index ) {
 
       // send packet to decoder
@@ -139,10 +137,8 @@ decode:
 
       // Receive decoded frame
       while (avcodec_receive_frame(codecCTX, frame) >= 0) {
-        // show progress Display
         double current_time = (double)total_samples_played / inf->sample_rate;
         ctx.state.position = (int)current_time;
-        // progress(state, current_time, duration_sec);
         total_samples_played += frame->nb_samples;
 
         pthread_mutex_lock(&state->lock);
@@ -258,7 +254,8 @@ decode:
     goto decode;
   }
 
-  printf("\n");
+  // send_cmd(&ctx.client_fd, "\n");
+  // printf("\n");
 
   // Cleanup
   pthread_mutex_lock(&state->lock);
@@ -296,22 +293,28 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
 }
 
 // reads the file and creates a Stream Context
-void get_audio_info(const char *filename)
+int get_audio_info(const char *filename)
 {
   // Read File
-  if ( avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0 )
-    die("ffmpeg: file type is not supported");
+  if ( avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0 ) {
+    warn("ffmpeg: file type is not supported");
+    return -1;
+  }
 
   // Check about Streams exists?
-  if ( avformat_find_stream_info(ctx.fmtCTX, NULL) < 0 )
-    die("ffmpeg: cannot find any streams");
+  if ( avformat_find_stream_info(ctx.fmtCTX, NULL) < 0 ) {
+    warn("ffmpeg: cannot find any streams");
+    return -1;
+  }
 
   // get audioStream
   int audioStream_index = -1;
-  audioStream_index = get_stream(AVMEDIA_TYPE_AUDIO);
+  audioStream_index = get_audio_stream();
 
-  if ( audioStream_index == -1 )
-    die("file: can't find AudioStream");
+  if ( audioStream_index == -1 ) {
+    warn("file: can't find AudioStream");
+    return -1;
+  }
 
   // get information codec about audio stream
   const AVCodecParameters *codecPAR = ctx.fmtCTX->streams[audioStream_index]->codecpar;
@@ -320,15 +323,20 @@ void get_audio_info(const char *filename)
   // allocate empty decoder
   ctx.codecCTX = avcodec_alloc_context3(codecID);
 
-  if ( !ctx.codecCTX )
-    die("ffmpeg: failed allocate codec!");
+  if ( !ctx.codecCTX ) {
+    warn("ffmpeg: failed allocate codec!");
+    return -1;
+  }
 
   // Copy codec information to decoder context
   avcodec_parameters_to_context(ctx.codecCTX, codecPAR);
 
   // initialize decoder with actual codec
-  if (avcodec_open2(ctx.codecCTX, codecID, NULL) < 0)
-    die("ffmpeg: failed init decoder!");
+  if (avcodec_open2(ctx.codecCTX, codecID, NULL) < 0) {
+    warn("ffmpeg: failed init decoder!");
+    return -1;
+
+  }
 
   // Speakers need INTERLEAVED format! Convert PLANAR to INTERLEAVED if needed.
   enum AVSampleFormat input_sample_fmt = ctx.codecCTX->sample_fmt;
@@ -340,6 +348,8 @@ void get_audio_info(const char *filename)
 
   // Store audio info to a struct audio
   store_information(audioStream_index, output_sample_fmt);
+
+  return 0;
 }
 
 // this handles playing audio files.
@@ -348,7 +358,7 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   av_log_set_level(AV_LOG_QUIET); // ignore warning
 
   // 1. get file information
-  get_audio_info(filename);
+  if (get_audio_info(filename) < 0) return -1;
 
   // 2. initialize a buffer, size = 500ms
   int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.5;
@@ -366,12 +376,6 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 
   // 6. NOW mark as ready! (after all initialization)
   ctx.state.ready = 1;
-
-  if (ctx.fmtCTX->metadata)
-    print_metadata(ctx.fmtCTX->metadata);
-
-  // printf("Playing: %s\n",  filename);
-  // printf("%.2dHz, %dch, %s\n", ctx.inf.sample_rate, ctx.inf.ch, av_get_sample_fmt_name(ctx.inf.sample_fmt));
 
   // 7. start threads
   pthread_t decoder_thread;

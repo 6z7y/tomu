@@ -4,15 +4,18 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
-#include "../share_info.h"
+#include "control.h"
+#include "../shared/share_info.h"
 
-#define false 0
-#define true 1
 
-void help();
+void sig_clean();
+
+
 int is_audio(const char *file);
 void cleanUP();
 void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_fmt_mode);
+
+int args_handle(char **argv);
 
 void verr(const char *fmt, va_list ap);
 void warn(const char *fmt, ...);
