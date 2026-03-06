@@ -4,25 +4,12 @@
 #include <sys/un.h>
 #include <termios.h>
 #include <poll.h>
+#include <errno.h>
+
 #include "backend.h"
 #include "control.h"
 #include "utils.h"
-#include <errno.h>
-
-#include "../../share_info.h"
 #include "../share_clients.h"
-
-void init_socket(int *server_fd)
-{
-  // 1. create socket
-  struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
-  *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (*server_fd < 0) die("Socket:");
-
-  // 2. Connect socket
-  if (connect(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-    die("Connect failed, make sure server running");
-}
 
 int main(int argc, char **argv)
 {
@@ -52,7 +39,7 @@ int main(int argc, char **argv)
 
   // for store thing
   char key[8];
-  char buf[256];
+  // char buf[256];
 
   // 6. main loop
   while(1) {
@@ -73,6 +60,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "Server disconnected\n");
             break;
         }
+
         progress(&status, status.position, status.duration);
     }
 

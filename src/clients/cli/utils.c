@@ -1,20 +1,29 @@
-#include "utils.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <stdarg.h>
 
-#include "../share_clients.h"
-#include "../../share_info.h"
+#include "utils.h"
+#include "../../shared/share_info.h"
 
 void clean_with_bye(int socket, int mode)
 {
   termios_mode(0);
 }
 
+// mode ( 1 = start ), ( 0 = close )
 void socket_mode(int mode, int *server_fd)
 {
+  // mode 1 (start)
   if (mode) {
     // 1. create socket
     struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
@@ -26,9 +35,7 @@ void socket_mode(int mode, int *server_fd)
       die("Connect failed, make sure server running");
   }
 
-  else {
-    close(*server_fd);
-  }
+  else close(*server_fd); // mode 0 (close)
 }
 
 
@@ -76,4 +83,32 @@ void help()
 
     "\nExample: tomu loop [FILE.mp3]\n"
   );
+}
+
+void verr(const char *fmt, va_list ap)
+{
+	vfprintf(stderr, fmt, ap);
+	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
+		fputc(' ', stderr);
+		perror(NULL);
+	} else {
+		fputc('\n', stderr);
+	}
+}
+
+void warn(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	verr(fmt, ap);
+  va_end(ap);
+}
+
+void die(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+  verr(fmt, ap);
+	va_end(ap);
+	exit(-1);
 }
