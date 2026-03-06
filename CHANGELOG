@@ -2,7 +2,8 @@
 - add struct to store metadata (not used yet)
 - improve source structure
 - move audio data structs to audio_data.h
-- fix some issues
+- reduce status delay to 80ms for responsive controls
+- fix client disconnect closing all other clients
 
 # 6z7y 1.0.5_1_beta - 2026-03-03
 - fix progress bugs
