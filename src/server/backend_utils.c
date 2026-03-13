@@ -210,12 +210,12 @@ void audio_buffer_reset()
 
 void audio_buffer_destroy(Audio_Buffer *buf)
 {
-  if (buf) {
-    if (buf->pcm_data) free(buf->pcm_data);
+  if (buf ){
+    free(buf->pcm_data);
     pthread_mutex_destroy(&buf->lock);
     pthread_cond_destroy(&buf->data_ready);
     pthread_cond_destroy(&buf->space_free);
-    free(buf);
+    free (ctx.buf);
   }
 }
 
@@ -255,4 +255,3 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   state->seek_target = 0;
   return;
 }
-
