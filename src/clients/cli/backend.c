@@ -2,7 +2,7 @@
 #include <unistd.h>
 
 #include "backend.h"
-#include "../share_clients.h"
+#include "../share_backend.h"
 
 void print_header(const char *filename, int sample_rate, int channels, const char *fmt_name)
 {

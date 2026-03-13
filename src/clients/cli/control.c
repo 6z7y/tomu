@@ -4,7 +4,10 @@
 
 #include "control.h"
 #include "utils.h"
-#include "../share_clients.h"
+#include "../share_backend.h"
+
+inline void send_cmd(int sock, Command cmd)
+{ write(sock, &cmd, sizeof(Command)); }
 
 static const KeyMap keymap[] = {
 //    KEY             EXEC
@@ -41,39 +44,3 @@ void handle_control(int sock, const char *key)
   }
 }
 
-void send_cmd(int sock, Command cmd)
-{
-  write(sock, &cmd, sizeof(Command));
-}
-
-
-// Add this to client/control.c
-
-// Send a file/dir path to server for playback
-void send_path(int sock, const char *path)
-{
-  Command cmd = CMD_PATH;
-  int pathlen = strlen(path);
-
-  // send: CMD_PATH | length | path
-  write(sock, &cmd,     sizeof(Command));
-  write(sock, &pathlen, sizeof(int));
-  write(sock, path,     pathlen);
-}
-
-// In handle_control(), add key "p" → ask for path:
-
-// void path_change(int sock, const char *key)
-// {
-//   if (!strcmp(key, "p")) {
-//     termios_mode(0);          // back to normal mode so user can type
-//     char path[1024];
-//     printf("Path: ");
-//     fgets(path, sizeof(path), stdin);
-//     path[strcspn(path, "\n")] = 0;  // remove newline
-//     send_path(sock, path);
-//     termios_mode(1);          // back to raw mode
-//     return;
-//
-//   }
-// }

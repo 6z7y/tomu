@@ -8,8 +8,8 @@ void clean_with_bye(int socket, int mode);
 void termios_mode(int mode);
 void help();
 
-void verr(const char *fmt, va_list ap);
-void warn(const char *fmt, ...);
-void die(const char *fmt, ...);
+// void verr(const char *fmt, va_list ap);
+// void warn(const char *fmt, ...);
+// void die(const char *fmt, ...);
 
 #endif
