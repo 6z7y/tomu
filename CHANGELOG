@@ -1,3 +1,7 @@
+# 6z7y 1.0.5_3_beta - 2026-03-14
+- removed path_handle from server
+- change: client now handles path and sends to server
+
 # 6z7y 1.0.5_2_beta - 2026-03-06
 - add struct to store metadata (not used yet)
 - improve source structure
