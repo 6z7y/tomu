@@ -16,10 +16,14 @@ SERVER_OBJECTS := $(patsubst $(SERVER_DIR)/%.c, $(SERVER_BUILD_DIR)/%.o, $(SERVE
 
 # # cli (CLIENT)
 CLIENT_CLI_NAME := tomucli
-CLIENT_CLI_DIR := src/clients/cli
+CLIENT_CLI_DIR := src/clients/cli src/clients
 CLIENT_CLI_BUILD_DIR := $(BUILD_DIR)/clients/cli
-CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
-CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
+# CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
+# CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
+CLIENT_CLI_DIRS := src/clients/cli src/clients
+CLIENT_CLI_SOURCES := $(foreach dir, $(CLIENT_CLI_DIRS), $(wildcard $(dir)/*.c))
+CLIENT_CLI_OBJECTS := $(foreach dir, $(CLIENT_CLI_DIRS), \
+    $(patsubst $(dir)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(wildcard $(dir)/*.c)))
 #
 # # tui (CLIENT)
 # CLIENT_TUI_NAME := tomutui
@@ -47,7 +51,11 @@ $(SERVER_BUILD_DIR)/%.o: $(SERVER_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(CLIENT_CLI_BUILD_DIR)/%.o: $(CLIENT_CLI_DIR)/%.c
+$(CLIENT_CLI_BUILD_DIR)/%.o: src/clients/cli/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+$(CLIENT_CLI_BUILD_DIR)/%.o: src/clients/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 #
