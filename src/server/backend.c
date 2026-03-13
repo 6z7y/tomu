@@ -254,9 +254,6 @@ decode:
     goto decode;
   }
 
-  // send_cmd(&ctx.client_fd, "\n");
-  // printf("\n");
-
   // Cleanup
   pthread_mutex_lock(&state->lock);
   state->running = 0;
@@ -394,7 +391,8 @@ clean_every:
   pthread_mutex_destroy(&ctx.state.lock);
   pthread_cond_destroy(&ctx.state.wait_cond);
   cleanUP();
+  // printf("hi\n");
   // Zero out per-song state so next song starts clean
-  memset(&ctx.inf, 0, sizeof(ctx.inf));
+  // memset(&ctx.inf, 0, sizeof(ctx.inf));
   return 0;
 }

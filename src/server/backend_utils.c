@@ -210,12 +210,12 @@ void audio_buffer_reset()
 
 void audio_buffer_destroy(Audio_Buffer *buf)
 {
-  if (buf ){
-    free(buf->pcm_data);
+  if (buf) {
+    if (buf->pcm_data) free(buf->pcm_data);
     pthread_mutex_destroy(&buf->lock);
     pthread_cond_destroy(&buf->data_ready);
     pthread_cond_destroy(&buf->space_free);
-    free (ctx.buf);
+    free(buf);
   }
 }
 
@@ -256,69 +256,3 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   return;
 }
 
-// void progress(Audio_State *state, double current_time, int duration_time)
-// {
-//   if (duration_time == 0) return;
-//
-//   int bar_width = 30;
-//   int pos = (current_time / duration_time) * bar_width;
-//
-//   int cur_m = get_min(current_time);
-//   int cur_s = get_sec(current_time);
-//   int dur_m = get_min(duration_time);
-//   int dur_s = get_sec(duration_time);
-//
-//   printf("\r%s[", state->paused ? "(Paused) " : "");
-//   for (int i = 0; i < bar_width; i++) {
-//     if      (i < pos)  printf("=");
-//     else if (i == pos) printf(">");
-//     else               printf(".");
-//   }
-//   printf("] %02d:%02d/%02d:%02d vol:%.0f%% speed:%.2fx",
-//          cur_m, cur_s, dur_m, dur_s,
-//          state->volume * 100, state->speed);
-//   fflush(stdout);
-// }
-
-
-
-// Read all the files in dir and return them 
-char **extractDir(const char* path, Dir_File *dir)
-{
-  // why do i realloc ? because i want O(n) 
-  // its better than count then add all the files it will be O(n^2)
-
-  // TODO make it only extract audio files
-  // TODO if there are no audio files, warn and return
-
-  struct dirent* dirent_file;
-  DIR *pwd = opendir(path);
-  int count_files = 0;
-  char **files = NULL;
-
-  while ((dirent_file = readdir(pwd)) != NULL) {
-
-    if ((!strcmp(dirent_file->d_name, ".")) || (!strcmp(dirent_file->d_name, ".."))) continue; // remove (".", "..")
-
-    // Grow array if needed
-    files = realloc(files, sizeof(char *) * (count_files + 1));
-    if (!files) goto clean_files;
-
-    files[count_files] = strdup(dirent_file->d_name);
-    count_files++;
-  }
-  closedir(pwd);
-
-  dir->totalFiles = count_files;
-  return files;
-
-clean_files:
-  // cleanup on failure
-  closedir(pwd);
-  for (int i = 0; i < count_files; i++)
-    free(files[i]);
-
-  free(files);
-  warn("not there files!");
-  return NULL;
-}

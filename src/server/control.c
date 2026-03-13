@@ -35,6 +35,10 @@ static const KeyMap keymap[] = {
     { CMD_SHUFFLE_TOGGEL,   shuffle_toggle          },
 };
 
+// send msg command to all client
+void send_cmd(int sock, Command cmd)
+{ write(sock, &cmd, sizeof(Command)); }
+
 void handle_key(Command cmd, Audio_State *state)
 {
   for (int i = 0; i < (sizeof(keymap) / sizeof(keymap[0])); i++)

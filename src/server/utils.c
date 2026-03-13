@@ -14,17 +14,8 @@
 #include "utils.h"
 #include "socket_utils.h"
 #include "../shared/share_info.h"
+#include "../shared/shared_control.h"
 
-static const char *filter_formats[] = {
-  ".mp3", ".opus", ".flac", ".wav",
-  ".ogg", ".aac", ".wma", ".aiff",
-  ".m4a"
-};
-
-void cleanUP(){
-  if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
-  if (ctx.codecCTX ) avcodec_free_context(&ctx.codecCTX);
-}
 
 void sig_clean()
 {
@@ -33,94 +24,43 @@ void sig_clean()
   exit(0);
 }
 
-
-int is_audio(const char *file)
-{
-    int len = strlen(file);
-    int limit = (sizeof(filter_formats) / sizeof(filter_formats[0]));
-
-    for (int i = 0; i < limit; i++){
-      int ext_len = strlen(filter_formats[i]);
-      if (!strcmp(file + len - ext_len, filter_formats[i]))
-        return 1; // is a file audio
-    }
-    return 0; // it's not a file audio
+void cleanUP(){
+  if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
+  if (ctx.codecCTX ) avcodec_free_context(&ctx.codecCTX);
 }
 
-void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_fmt_mode)
+// socket mode ( 1 = start ), ( 0 = close )
+void socket_mode(int mode, int *server_fd)
 {
-    Dir_File *dir = &ctx.dir;
+  unlink(SOCKET_PATH); // remove old socket file
 
-    struct stat st;
-    if (stat(path, &st) < 0) { warn("File:"); return; }
+  if (mode) {
+    // 1. initlize socket protocol
+    struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
+    *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (*server_fd < 0) die("Socket:");
 
-    // If path is a directory
-    if (S_ISDIR(st.st_mode)) {
-        if (!(dir->files = extractDir(path, dir))) return; // assume this returns char** array
+    // 2. bind socket to file
+    if (bind(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) die("Bind:");
 
-        srand(time(NULL));
+    // 3. enter listen mode
+    if (listen(*server_fd, MAX_CLIENT) < 0) die("Listen:");
+  }
 
-        dir->currentFile = shuffle_mode ? rand() % dir->totalFiles : 0;
-
-        int counter_try = 0;
-
-        while (1){
-          if (dir->currentFile < 0) dir->currentFile = dir->totalFiles - 1;
-          if (dir->currentFile >= dir->totalFiles) dir->currentFile = 0;
-
-          char filename[1024];
-          snprintf(filename, sizeof(filename), "%s/%s", path, dir->files[dir->currentFile]);
-
-          // Skip non-audio files
-          if (!skip_fmt_mode){
-            if (counter_try >= 7) {
-              warn("is not there audio files!\n");
-              break;
-            }
-            if (!is_audio(filename)) {
-              printf("'%s' is not audio file, skipping\n", filename);
-              dir->currentFile++;
-              counter_try++;
-              continue;
-            }
-          }
-
-          /* reset skip flag before playing */
-          ctx.state.skip_to_next = 1;
-
-          // Play audio
-          playback_run(filename, loop_mode, shuffle_mode);
-
-          /* q was pressed — fully quit */
-          if (ctx.state.skip_to_next == 0) break;
-
-          /* next / prev / shuffle */
-          if (ctx.state.shuffle)
-              dir->currentFile = rand() % dir->totalFiles;
-          else
-              dir->currentFile += ctx.state.skip_to_next; /* +1 or -1 */
-        }
-
-        // Cleanup
-        for (int i = 0; i < dir->totalFiles; i++)
-            free(dir->files[i]);
-        free(dir->files);
-    }
-
-    // If path is a regular file
-    else if (S_ISREG(st.st_mode)) {
-
-        if (!skip_fmt_mode){
-          if (!is_audio(path)) {
-              printf("'%s' is not audio file\n", path);
-              return;
-          }
-        }
-        playback_run(path, loop_mode, shuffle_mode);
-    }
-
-    else warn("File:");
+  else close(*server_fd);
 }
+
+
+
+static inline void help()
+{
+  printf(
+      "Usage: tomu\n\n"
+
+      " TODO: Later\n"
+  );
+}
+
 
 // handle command-line arguments
 int args_handle(char **argv)
@@ -129,11 +69,10 @@ int args_handle(char **argv)
   if (!option) return 0; // no arguments given, continue normally
 
   if (option[0] == '-' && option[1] == '-') {
-    if (!strcmp(argv[1], "--version")) printf("Tomu: %s\n", SERVER_VER);
+    if      (!strcmp(argv[1], "--version")) printf("Tomu: %s\n", SERVER_VER);
+    else if (!strcmp(argv[1], "--help")) help();
 
-    // TODO: add --help
-
-    else warn("[T]: unknown option '%s'", option);
+    else warn("[T]: unknown option '%s', try '%s --help'", option, SERVER_NAME);
   }
   else {
     warn("[T]: unknown option '%s'", option);
