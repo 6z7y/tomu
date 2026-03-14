@@ -96,46 +96,59 @@ void handle_client_events(int i, struct pollfd *fds, Client_connection *client)
   Command cmd;
   int n = read(client[i].fd, &cmd, sizeof(cmd));
 
-  // check disconnect on read, not write
   if (n <= 0) {
     client_die(i, client);
-
-    // unpause if this client left while paused
     if (ctx.state.paused)
       playback_toggle(&ctx.state);
+    return;  // ← return early, don't fall through
   }
 
-  else if (cmd == CMD_PATH) {
-    int pathlen = 0;
-    read(client[i].fd, &pathlen, sizeof(int));
-    if (pathlen > 0 && pathlen < 2048) {
-      char *path = malloc(pathlen + 1);
-      read(client[i].fd, path, pathlen);
-      path[pathlen] = '\0';
-      start_playback(path);
-      free(path);
-    }
+  if (cmd == CMD_PATH) {
+      int pathlen = 0;
+      read(client[i].fd, &pathlen, sizeof(int));
+      if (pathlen > 0 && pathlen < 2048) {
+          char *path = malloc(pathlen + 1);
+          read(client[i].fd, path, pathlen);
+          path[pathlen] = '\0';
+
+          if (ctx.queue_count < 200) {
+              ctx.queue_list[ctx.queue_count] = strdup(path);
+              ctx.queue_count++;
+          }
+          free(path);
+
+          // only start if nothing is playing
+          if (!ctx.playback_active)
+              start_playback(ctx.queue_list[ctx.queue_index]);
+      }
+  }
+  else {
+    handle_key(cmd, &ctx.state);
   }
 
-  else handle_key(cmd, &ctx.state);
-
-  broadcast_status(client); // when user holding in key he will update it
+  broadcast_status(client);
 }
 
 void *start_playback_thread(void *arg) {
     char *path = (char*)arg;
     playback_run(path, 0, 1);
     free(path);
-    ctx.playback_active = 0;  // mark done when playback ends
+    ctx.playback_active = 0;
+
+    ctx.queue_index++;
+    if (ctx.queue_index < ctx.queue_count) {
+        char *next = strdup(ctx.queue_list[ctx.queue_index]);
+        pthread_create(&ctx.playback_thread, NULL, start_playback_thread, next);
+        ctx.playback_active = 1;
+    }
+
     return NULL;
 }
 
 void start_playback(const char *path) {
-    // If already playing, stop it first
     if (ctx.playback_active) {
-
         playback_stop(&ctx.state);
-        pthread_join(ctx.playback_thread, NULL);
+        pthread_detach(ctx.playback_thread);  // ← detach instead of join
         ctx.playback_active = 0;
     }
 
