@@ -7,7 +7,7 @@
 #include "control.h"
 #include "../shared/share_info.h"
 
-void sig_clean();
+void sig_clean(int sig);
 void cleanUP();
 
 void socket_mode(int mode, int *server_fd);

@@ -17,12 +17,13 @@
 #include "../shared/shared_control.h"
 
 
-void sig_clean()
+void sig_clean(int sig)
 {
   cleanUP();
   socket_mode(0, &ctx.server_fd);
   exit(0);
 }
+
 
 void cleanUP(){
   if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
