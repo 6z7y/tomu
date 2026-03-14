@@ -81,6 +81,9 @@ typedef struct PlayBackContext{
   Audio_Buffer *buf;
   Audio_Info inf;
   int playback_active;
+  char *queue_list[200];
+  int queue_count;   // how many paths in queue
+  int queue_index;   // which one is currently playing
   pthread_t playback_thread;
   AVFormatContext *fmtCTX;
   AVCodecContext *codecCTX;
