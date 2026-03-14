@@ -1,3 +1,7 @@
+# 6z7y 1.0.5_4_beta - 2026-03-14
+- server: add queue array, read and play paths in order
+- fix: crash on skip and new path while playing
+
 # 6z7y 1.0.5_3_beta - 2026-03-14
 - removed path_handle from server
 - change: client now handles path and sends to server
