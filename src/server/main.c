@@ -13,6 +13,8 @@ int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean);
 
+      ctx.queue_count = 0;
+
   // 1. check args
   if (args_handle(argv) == 1) goto bye;
 
