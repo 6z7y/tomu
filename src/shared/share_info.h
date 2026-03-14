@@ -3,7 +3,7 @@
 
 // server info
 #define SERVER_NAME "tomu"
-#define SERVER_VER "1.0.5_3"
+#define SERVER_VER "1.0.5_4"
 
 // client cli info
 #define CLIENT_CLI_NAME "tomucli"
