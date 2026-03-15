@@ -1,3 +1,9 @@
+# 6z7y 1.0.6_beta - 2026-03-15
+- improve argument handle for tomu, tomucli
+- fix some signatures (int -> int*)
+- clean includes
+- clean codes
+
 # 6z7y 1.0.5_4_beta - 2026-03-14
 - server: add queue array, read and play paths in order
 - fix: crash on skip and new path while playing
