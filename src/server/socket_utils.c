@@ -1,4 +1,3 @@
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,8 +8,6 @@
 
 #include "socket_utils.h"
 #include "control.h"
-#include "utils.h"
-
 
 // add client active to poll struct
 int add_client_into_poll(struct pollfd *fds, Client_connection *client)
