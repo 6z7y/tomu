@@ -9,7 +9,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include <errno.h>
 
 #include "share_data.h"
 #include "share_backend.h"
