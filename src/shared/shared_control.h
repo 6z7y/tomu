@@ -41,37 +41,8 @@ typedef enum {
   CMD_LOOP_TOGGLE,
   CMD_SHUFFLE_TOGGEL,
   CMD_PATH,
-  CMD_QUIT_SERVER_FULL,
+  // CMD_QUIT_SERVER_FULL,
 
 } Command;
-
-
-// void verr(const char *fmt, va_list ap)
-// {
-// 	vfprintf(stderr, fmt, ap);
-// 	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
-// 		fputc(' ', stderr);
-// 		perror(NULL);
-// 	} else {
-// 		fputc('\n', stderr);
-// 	}
-// }
-//
-// void warn(const char *fmt, ...)
-// {
-// 	va_list ap;
-// 	va_start(ap, fmt);
-// 	verr(fmt, ap);
-//   va_end(ap);
-// }
-//
-// void die(const char *fmt, ...)
-// {
-// 	va_list ap;
-// 	va_start(ap, fmt);
-//   verr(fmt, ap);
-// 	va_end(ap);
-// 	exit(-1);
-// }
 
 #endif
