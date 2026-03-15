@@ -4,11 +4,9 @@
 #include "../../shared/shared_control.h"
 #include "../share_data.h"
 
-inline void send_cmd(int sock, Command cmd);
-void handle_control(int sock, const char *key);
-void send_cmd(int sock, Command cmd);
+inline void send_cmd(int *server_fd, Command cmd);
+void handle_control(int *server_fd, const char *key);
 
 void send_path(int sock, const char *path);
-// void path_change(int sock, const char *key);
 
 #endif

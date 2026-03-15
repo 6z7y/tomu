@@ -6,12 +6,12 @@
 #include "utils.h"
 #include "../share_backend.h"
 
-inline void send_cmd(int sock, Command cmd)
-{ write(sock, &cmd, sizeof(Command)); }
+inline void send_cmd(int *server_fd, Command cmd)
+{ write(*server_fd, &cmd, sizeof(Command)); }
 
 static const KeyMap keymap[] = {
 //    KEY             EXEC
-    { "q",          CMD_STOP             },
+    // { "q",          CMD_STOP             },
     { " ",          CMD_PLAY_TOGGLE      },
     { "\n",         CMD_NEXT_AUDIO       },
     { ">",          CMD_NEXT_AUDIO       },
@@ -29,15 +29,15 @@ static const KeyMap keymap[] = {
     { "s",          CMD_SHUFFLE_TOGGEL   },
 };
 
-void handle_control(int sock, const char *key)
+void handle_control(int *server_fd, const char *key)
 {
   for (int i = 0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
     if (!strcmp(key, keymap[i].key)) {
-      send_cmd(sock, keymap[i].cmd);
+      send_cmd(server_fd, keymap[i].cmd);
       // printf("%s\n", key );
 
-      if (!strcmp(key, "q")) clean_with_bye(sock, 0);
-      if (!strcmp(key, "h")) help();
+      if (!strcmp(key, "q")) clean_with_bye(server_fd);
+      // if (!strcmp(key, "h")) help();
 
       return;
     }
