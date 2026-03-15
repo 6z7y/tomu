@@ -1,31 +1,34 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <termios.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <stdarg.h>
 
 #include "utils.h"
 #include "../share_backend.h"
-#include "../share_backend.h"
 #include "../../shared/share_info.h"
-#include "../../shared/shared_control.h"
 
-void clean_with_bye(int socket, int mode)
+// arg compare opts
+static const char *help_opts[] = {"--help", "-h", NULL};       // help
+static const char *ver_opts[]  = {"--version", "-v", NULL}; // version
+
+// void sig_clean(int sig)
+// {
+//   socket_mode(0, &socket);
+//   termios_mode(0);
+// }
+
+void clean_with_bye(int *server_fd)
 {
+  socket_mode(server_fd, 0);
   termios_mode(0);
-  close(socket);
 }
 
 // mode ( 1 = start ), ( 0 = close )
-void socket_mode(int mode, int *server_fd)
+void socket_mode(int *server_fd, int mode)
 {
   // mode 1 (start)
   if (mode) {
@@ -61,15 +64,15 @@ void termios_mode(int mode)
   else tcsetattr(STDIN_FILENO, TCSANOW, &old);
 }
 
-void help()
+static inline void help()
 {
   printf(
-    "Usage: tomucli [PATH]\n"
-    " Commands:\n\n"
+    "Usage: tomucli [Dir/OR/File]\n"
+    " Options:\n\n"
 
-    "   --loop            : loop same sound\n"
-    "   --version         : show version of program\n"
-    "   --help            : show help message\n"
+    // "   --loop            : loop same sound\n"
+    "   --help,    -h        : show help message\n"
+    "   --version, -v        : show version of program\n"
 
     "\nkeys:\n"
     " (Space) = pause/resume\n"
@@ -85,34 +88,33 @@ void help()
     " (]) = audio speed increase\n"
     " (</>) = (Pervious/Next) audio\n"
 
-    "\nExample: tomu loop [FILE.mp3]\n"
+    "\nExample: tomu [FILE.mp3]\n"
   );
 }
 
-// void verr(const char *fmt, va_list ap)
-// {
-// 	vfprintf(stderr, fmt, ap);
-// 	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
-// 		fputc(' ', stderr);
-// 		perror(NULL);
-// 	} else {
-// 		fputc('\n', stderr);
-// 	}
-// }
-//
-// void warn(const char *fmt, ...)
-// {
-// 	va_list ap;
-// 	va_start(ap, fmt);
-// 	verr(fmt, ap);
-//   va_end(ap);
-// }
-//
-// void die(const char *fmt, ...)
-// {
-// 	va_list ap;
-// 	va_start(ap, fmt);
-//   verr(fmt, ap);
-// 	va_end(ap);
-// 	exit(-1);
-// }
+static inline int match_opt(const char *arg, const char **opts)
+{
+  for (int i=0; opts[i]; i++)
+      if (!strcmp(arg, opts[i])) return 1;
+
+  return 0;
+}
+
+int args_handle(const char *option)
+{
+  if (!option) return 0; // no arguments given, continue normally
+
+  // there "--arg"
+  if (option[0] == '-') {
+
+    if      (match_opt(option, help_opts)) help();
+
+    else if (match_opt(option, ver_opts)) printf("tomucli: %s\n", TOMUCLI_VER);
+
+    else    warn("[T]: unknown option '%s'\n\ntry '%s --help'", option, TOMUCLI_NAME);
+
+    return 1;
+  }
+
+  return 0;
+}
