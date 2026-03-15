@@ -1,7 +1,6 @@
 #ifndef SHARE_DATA
 #define SHARE_DATA
 
-// struct for data of the files in dir
 typedef struct {
   char** files;
   int totalFiles;
