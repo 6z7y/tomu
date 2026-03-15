@@ -17,96 +17,100 @@
 
 int main(int argc, char **argv)
 {
-    int server_fd;
-    PlaybackQueue queue = {0};
+  // signal(SIGINT, sig_clean); // when prog close by ctrl+c
+  // 1. check args
+  if (args_handle(argv[argc - 1]) == 1) goto bye;
 
-    // 1. connect to server
-    socket_mode(1, &server_fd);
+  int server_fd; // socket fd session between server
+  PlaybackQueue queue = {0}; // about path
 
-    // 2. enter raw terminal
-    termios_mode(1);
+  // 2. enter raw terminal
+  termios_mode(1);
 
-    // Send client type
-    ClientType my_type = CLIENT_CLI;
-    write(server_fd, &my_type, sizeof(ClientType));
+  // 3. connect to server
+  socket_mode(&server_fd, 1);
 
-    // 3. if path given, send it to server
-    if (argc == 2)
-        path_handle(server_fd, argv[argc-1], &queue);
+  // 4. send client type
+  ClientType my_type = CLIENT_CLI;
+  printf("sizeof clienttype: %zu, and type var: %zu\n", sizeof(ClientType), sizeof(my_type));
+  write(server_fd, &my_type, sizeof(ClientType));
 
-    TomuStatus status = {0};
-    int playback_finished = 0;
+  if (argc == 2) path_handle(server_fd, argv[argc-1], &queue);
 
-    // 4. init poll
-    struct pollfd fds[2];
-    fds[0].fd = server_fd;
-    fds[0].events = POLLIN;
-    fds[1].fd = STDIN_FILENO;
-    fds[1].events = POLLIN;
+  TomuStatus status = {0};
+  int playback_finished = 0;
 
-    char key[8];
+  // 4. init poll
+  struct pollfd fds[2];
+  fds[0].fd = server_fd;
+  fds[0].events = POLLIN;
+  fds[1].fd = STDIN_FILENO;
+  fds[1].events = POLLIN;
 
-    // 5. main loop
-    while(1) {
-        int ret = poll(fds, 2, 1000);
-        if (ret < 0) { continue; }  // FIX: was <= 0, timeout (0) was being eaten
-                                    //
-        if (ret == 0) {  // timeout = silence = song ended
-            if (queue.has_queue && !playback_finished) {
-                playback_finished = 1;
-                handle_playback_complete(server_fd, &queue);
-            }
-            continue;
-        }
+  char key[8];
 
-        if (fds[0].revents & POLLIN) {
-            TomuStatus tmp;
-            int n;
-            while ((n = read(server_fd, &tmp, sizeof(tmp))) == (int)sizeof(tmp)) {
-                status = tmp;
-                playback_finished = 0;  // ← ADD THIS: server talking = song alive, reset flag
+  // 5. main loop
+  while(1) {
+      int ret = poll(fds, 2, 1000);
+      if (ret < 0) { continue; }
 
-                struct pollfd pfd = { .fd = server_fd, .events = POLLIN };
-                if (poll(&pfd, 1, 0) <= 0) break;
-            }
-            if (n == 0 || (n < 0 && errno != EAGAIN)) {
-                fprintf(stderr, "Server disconnected\n");
-                break;
-            }
+      if (ret == 0) {  // timeout = silence = song ended
+          if (queue.has_queue && !playback_finished) {
+              playback_finished = 1;
+              handle_playback_complete(server_fd, &queue);
+          }
+          continue;
+      }
 
-            progress(&status, status.position, status.duration);
-        }
+      if (fds[0].revents & POLLIN) {
+          TomuStatus tmp;
+          int n;
+          while ((n = read(server_fd, &tmp, sizeof(tmp))) == (int)sizeof(tmp)) {
+              status = tmp;
+              playback_finished = 0;
 
-        if (fds[1].revents & POLLIN) {
-            int n = read(STDIN_FILENO, key, sizeof(key) - 1);
-            if (n > 0) {
-                key[n] = '\0';
-                handle_control(server_fd, key);
+              struct pollfd pfd = { .fd = server_fd, .events = POLLIN };
+              if (poll(&pfd, 1, 0) <= 0) break;
+          }
+          if (n == 0 || (n < 0 && errno != EAGAIN)) {
+              fprintf(stderr, "Server disconnected\n");
+              break;
+          }
 
-                if (!strcmp(key, "\n") || !strcmp(key, ">")) {
-                    if (queue.has_queue)
-                        handle_playback_complete(server_fd, &queue);
-                }
-                else if (!strcmp(key, "<")) {
-                    if (queue.has_queue) {
-                        queue.dir.currentFile--;
-                        if (queue.dir.currentFile < 0)
-                            queue.dir.currentFile = queue.dir.totalFiles - 1;
-                        send_next_from_queue(server_fd, &queue);
-                    }
-                }
-            }
-        }
-    }
+          progress(&status, status.position, status.duration);
+      }
 
-    termios_mode(0);
-    socket_mode(0, &server_fd);
+      if (fds[1].revents & POLLIN) {
+          int n = read(STDIN_FILENO, key, sizeof(key) - 1);
+          if (n > 0) {
+              key[n] = '\0';
+              handle_control(&server_fd, key);
 
-    if (queue.has_queue) {
-        for (int i = 0; i < queue.dir.totalFiles; i++)
-            free(queue.dir.files[i]);
-        free(queue.dir.files);
-    }
+              if (!strcmp(key, "\n") || !strcmp(key, ">")) {
+                  if (queue.has_queue)
+                      handle_playback_complete(server_fd, &queue);
+              }
+              else if (!strcmp(key, "<")) {
+                  if (queue.has_queue) {
+                      queue.dir.currentFile--;
+                      if (queue.dir.currentFile < 0)
+                          queue.dir.currentFile = queue.dir.totalFiles - 1;
+                      send_next_from_queue(server_fd, &queue);
+                  }
+              }
+          }
+      }
+  }
 
-    return 0;
+  termios_mode(0);
+  socket_mode(&server_fd, 0);
+
+  if (queue.has_queue) {
+      for (int i = 0; i < queue.dir.totalFiles; i++)
+          free(queue.dir.files[i]);
+      free(queue.dir.files);
+  }
+
+bye:
+  return 0;
 }
