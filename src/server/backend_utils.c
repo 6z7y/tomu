@@ -2,7 +2,6 @@
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
 #include <dirent.h>
-#include <string.h>
 #include <unistd.h>
 
 #include "audio_data.h"
@@ -93,7 +92,6 @@ int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
 
 void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX)
 {
-  // int new_rate = (int)(inf->sample_rate * ctx->state->speed);
   int new_rate = (int)(inf->sample_rate / ctx.state.speed);
   enum AVSampleFormat input_fmt = frame->format;
   enum AVSampleFormat output_fmt = inf->sample_fmt;
@@ -134,7 +132,6 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   state->speed = 1.00f;
   state->looping = 0;
   state->shuffle = 1;
-  // state->skip_to_next = 0;
 
   state->seek_request = 0;
   state->seek_target = 0;

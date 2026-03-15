@@ -12,10 +12,7 @@ void cleanUP();
 
 void socket_mode(int mode, int *server_fd);
 
-// int is_audio(const char *file);
-// void path_handle(const char *path, uint loop_mode, uint shuffle_mode, uint skip_fmt_mode);
-
-int args_handle(char **argv);
+int args_handle(const char *option);
 
 void verr(const char *fmt, va_list ap);
 void warn(const char *fmt, ...);

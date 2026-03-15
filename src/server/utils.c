@@ -5,16 +5,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "backend.h"
-#include "backend_utils.h"
 #include "utils.h"
-#include "socket_utils.h"
 #include "../shared/share_info.h"
-#include "../shared/shared_control.h"
+
+// arg compare opts
+static const char *help_opts[] = {"--help", "-h", NULL};       // help
+static const char *ver_opts[]  = {"--version", "-v", NULL}; // version
 
 
 void sig_clean(int sig)
@@ -51,8 +50,6 @@ void socket_mode(int mode, int *server_fd)
   else close(*server_fd);
 }
 
-
-
 static inline void help()
 {
   printf(
@@ -62,24 +59,32 @@ static inline void help()
   );
 }
 
+static inline int match_opt(const char *arg, const char **opts)
+{
+  for (int i=0; opts[i]; i++)
+      if (!strcmp(arg, opts[i])) return 1;
+
+  return 0;
+}
 
 // handle command-line arguments
-int args_handle(char **argv)
+int args_handle(const char *option)
 {
-  char *option = argv[1];
   if (!option) return 0; // no arguments given, continue normally
 
-  if (option[0] == '-' && option[1] == '-') {
-    if      (!strcmp(argv[1], "--version")) printf("Tomu: %s\n", SERVER_VER);
-    else if (!strcmp(argv[1], "--help")) help();
+  // there "--arg"
+  if (option[0] == '-') {
 
-    else warn("[T]: unknown option '%s', try '%s --help'", option, SERVER_NAME);
-  }
-  else {
-    warn("[T]: unknown option '%s'", option);
+    if      (match_opt(option, help_opts)) help();
+
+    else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
+
+    else    warn("[T]: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
+
+    return 1;
   }
 
-  return 1;
+  return 0;
 }
 
 void verr(const char *fmt, va_list ap)

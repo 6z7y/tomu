@@ -1,9 +1,6 @@
 #include <unistd.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "control.h"
 #include "socket_utils.h"
 #include "utils.h"
@@ -16,7 +13,7 @@ int main(int argc, char **argv)
       ctx.queue_count = 0;
 
   // 1. check args
-  if (args_handle(argv) == 1) goto bye;
+  if (args_handle(argv[argc - 1]) == 1) goto bye;
 
   // 2. init socket
   int *server_fd = &ctx.server_fd;
@@ -29,9 +26,7 @@ int main(int argc, char **argv)
 
   // 4. init poll
   struct pollfd fds[1 + MAX_CLIENT];
-  memset(fds, 0, sizeof(fds));
-  fds[0].fd = *server_fd;
-  fds[0].events = POLLIN;
+  fds[0] = (struct pollfd){.fd = *server_fd, .events = POLLIN };
 
   // 5. main loop (server will stay here)
   while(1) {
@@ -67,7 +62,6 @@ int main(int argc, char **argv)
       index++;
     }
   }
-
 
   // 11. close socket
   socket_mode(0, &ctx.server_fd);
