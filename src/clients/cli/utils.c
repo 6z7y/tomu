@@ -12,19 +12,21 @@
 #include "../../shared/share_info.h"
 
 // arg compare opts
-static const char *help_opts[] = {"--help", "-h", NULL};       // help
+static const char *help_opts[] = {"--help", "-h", NULL};    // help
 static const char *ver_opts[]  = {"--version", "-v", NULL}; // version
 
-// void sig_clean(int sig)
-// {
-//   socket_mode(0, &socket);
-//   termios_mode(0);
-// }
+void sig_clean(int sig)
+{
+  socket_mode(&client_ctx.server_fd, 0);
+  termios_mode(0);
+  _exit(0);
+}
 
 void clean_with_bye(int *server_fd)
 {
   socket_mode(server_fd, 0);
   termios_mode(0);
+  _exit(0);
 }
 
 // mode ( 1 = start ), ( 0 = close )
