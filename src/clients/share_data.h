@@ -14,4 +14,11 @@ typedef struct {
   int has_queue;  // Whether we're in directory playback mode
 } PlaybackQueue;
 
+typedef struct {
+  int server_fd;
+  PlaybackQueue queue;
+} Client_CTX;
+
+extern Client_CTX client_ctx;
+
 #endif
