@@ -11,7 +11,6 @@ inline void send_cmd(int *server_fd, Command cmd)
 
 static const KeyMap keymap[] = {
 //    KEY             EXEC
-    // { "q",          CMD_STOP             },
     { " ",          CMD_PLAY_TOGGLE      },
     { "\n",         CMD_NEXT_AUDIO       },
     { ">",          CMD_NEXT_AUDIO       },
@@ -36,11 +35,12 @@ void handle_control(int *server_fd, const char *key)
       send_cmd(server_fd, keymap[i].cmd);
       // printf("%s\n", key );
 
-      if (!strcmp(key, "q")) clean_with_bye(server_fd);
-      // if (!strcmp(key, "h")) help();
+      }
 
-      return;
-    }
+  }
+
+  if (!strcmp(key, "q")) {
+    printf("hi\n");
+    clean_with_bye(server_fd);
   }
 }
-
