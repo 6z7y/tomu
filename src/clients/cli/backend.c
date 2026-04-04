@@ -4,13 +4,11 @@
 #include "backend.h"
 #include "../share_backend.h"
 
-void print_header(const char *filename, int sample_rate, int channels, const char *fmt_name)
+void print_header(const char *filename)
 {
-  printf("\033[H");     // move to top of screen (row 1, col 1)
-  printf("\033[2J");    // clear entire screen
-  printf("\033[1;1H");  // row 1: filename
+  printf("\033[?25l");
   printf("Playing: %s\n", filename);
-  printf("%.2dHz, %dch, %s\n", sample_rate, channels, fmt_name);  // row 2
+  // printf("%.2dHz, %dch, %s\n", sample_rate, channels, fmt_name);  // row 2
   fflush(stdout);
 }
 
@@ -18,14 +16,10 @@ void progress(TomuStatus *status, double current_time, int duration_time)
 {
   if (duration_time == 0) return;
 
-  int bar_width = 30;
+  int bar_width = 32;
   int pos = (int)((current_time / duration_time) * bar_width);
-
-  // Move to line 3 (below the 2 header lines) and clear from there down
-  printf("\033[3;1H");   // move cursor to row 3, col 1
-  printf("\033[0J");     // clear from cursor to end of screen
-
-  printf("%s[", status->paused ? " (Paused) " : "");
+    printf("\033[2K\r");              // clear current line, carriage return
+  printf("\r%s[", status->paused ? " (Paused) " : "");
   for (int i = 0; i < bar_width; i++) {
     if      (i < pos)  printf("=");
     else if (i == pos) printf(">");
