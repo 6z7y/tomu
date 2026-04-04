@@ -14,6 +14,7 @@
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value);
 ma_format get_ma_format(enum AVSampleFormat value);
 
+int get_audio_info(const char *filename);
 int get_audio_stream();
 void store_information(int audioStream_index, enum AVSampleFormat output_sample_fmt);
 
