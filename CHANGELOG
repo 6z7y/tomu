@@ -1,3 +1,14 @@
+# 6z7y 1.0.6_1_beta - 2026-03-XX
+* tomu: 
+  - move get_info() from backend.c to backend_utils.c
+  - move audio buffer (read/write) and miniaudio callback to audio_backend.c
+
+* tomucli: 
+  - improved output
+  - hide cursor
+  - fix 'q' key to quit from program
+  - can handle sig
+
 # 6z7y 1.0.6_beta - 2026-03-15
 - improve argument handle for tomu, tomucli
 - fix some signatures (int -> int*)
