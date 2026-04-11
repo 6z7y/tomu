@@ -6,6 +6,13 @@
 #include "audio_data.h"
 #include "../shared/shared_control.h"
 
+typedef enum {
+  CLIENT_CLI,
+  CLIENT_TUI,
+  CLIENT_GUI,
+
+} ClientType;
+
 typedef struct {
   int fd;            // fd for client
   int active;        // for make listent the client mode
