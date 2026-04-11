@@ -1,6 +1,14 @@
 #ifndef SHARE_DATA
 #define SHARE_DATA
 
+typedef enum {
+  CLIENT_CLI,
+  CLIENT_TUI,
+  CLIENT_GUI,
+
+} ClientType;
+
+
 typedef struct {
   char** files;
   int totalFiles;
