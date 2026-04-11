@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <signal.h>
+
 #include "control.h"
 #include "socket_utils.h"
 #include "utils.h"
@@ -12,37 +13,29 @@ int main(int argc, char **argv)
 
       ctx.queue_count = 0;
 
-  // 1. check args
   if (args_handle(argv[argc - 1]) == 1) goto bye;
 
-  // 2. init socket
+  // 1. init socket
   int *server_fd = &ctx.server_fd;
   int *client_fd = &ctx.client_fd;
-
   socket_mode(1, server_fd); // socket on
 
-  // 3. init client array
+  // 2. init client array
   Client_connection client[MAX_CLIENT] = {0};
 
-  // 4. init poll
+  // 3. init poll
   struct pollfd fds[1 + MAX_CLIENT];
   fds[0] = (struct pollfd){.fd = *server_fd, .events = POLLIN };
 
-  // 5. main loop (server will stay here)
+  // 4. main loop (server will stay here)
   while(1) {
-    // 6. add client active inside poll
-    int nfds = add_client_into_poll(fds, client);
+    // 5. add client active inside poll
+    int nfds = add_client_into_poll(fds, client); // number clients active now
 
-    // 7. start poll mode
+    // 6. start poll mode
     int ret = poll(fds, nfds, 100); // 100ms timeout
 
-    if (ret < 0) { 
-      if (errno == EINTR) continue; // Interrupted by signal
-      warn("Poll ret:"); 
-      continue; 
-    }
-
-    // 8. broadcast status to all active clients on timeout
+    // 7. broadcast status to all active clients on timeout
     if (ret == 0) {
       if (ctx.playback_active) broadcast_status(client);
       continue;
@@ -53,7 +46,7 @@ int main(int argc, char **argv)
 
     // 10. read client keys
     int index = 1; // begin from 1 for clients, server take 0
-    for (int i=0; i<MAX_CLIENT; i++) {
+    for_each_num(MAX_CLIENT) {
       if (!client[i].active) continue;
 
       if (index < nfds && fds[index].revents & POLLIN) {
