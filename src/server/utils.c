@@ -15,14 +15,12 @@
 static const char *help_opts[] = {"--help", "-h", NULL};       // help
 static const char *ver_opts[]  = {"--version", "-v", NULL}; // version
 
-
 void sig_clean(int sig)
 {
   cleanUP();
   socket_mode(0, &ctx.server_fd);
   exit(0);
 }
-
 
 void cleanUP(){
   if (ctx.fmtCTX ) avformat_close_input(&ctx.fmtCTX);
@@ -35,15 +33,15 @@ void socket_mode(int mode, int *server_fd)
   unlink(SOCKET_PATH); // remove old socket file
 
   if (mode) {
-    // 1. initlize socket protocol
+    // initlize socket protocol
     struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
     *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (*server_fd < 0) die("Socket:");
 
-    // 2. bind socket to file
+    // bind socket to file
     if (bind(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) die("Bind:");
 
-    // 3. enter listen mode
+    // enter listen mode
     if (listen(*server_fd, MAX_CLIENT) < 0) die("Listen:");
   }
 
