@@ -1,29 +1,6 @@
 #ifndef SHARED_CONTROL_H
 #define SHARED_CONTROL_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-
-typedef struct {
-  int   duration;
-  int   position;
-  int   paused;
-  float volume;
-  float speed;
-  int   shuffle;
-  int   loop;
-
-} TomuStatus;
-
-typedef enum {
-  CLIENT_CLI,
-  CLIENT_TUI,
-  CLIENT_GUI,
-
-} ClientType;
-
 typedef enum {
   CMD_PLAY_TOGGLE,
   CMD_STOP,
@@ -44,5 +21,16 @@ typedef enum {
   // CMD_QUIT_SERVER_FULL,
 
 } Command;
+
+typedef struct {
+  int   duration;
+  int   position;
+  int   paused;
+  float volume;
+  float speed;
+  int   shuffle;
+  int   loop;
+
+} TomuStatus;
 
 #endif
