@@ -23,20 +23,20 @@ int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean); // when prog close by ctrl+c
 
-  // 1. check args
+  // check args
   if (args_handle(argv[argc - 1]) == 1) goto bye;
   printf("\033[?25l"); // hide cursor
 
   int *server_fd = &client_ctx.server_fd; // socket fd session between server
   PlaybackQueue *queue = &client_ctx.queue; // about path
 
-  // 2. connect to server
+  // 1. connect to server
   socket_mode(server_fd, 1);
 
-  // 3. enter raw terminal
+  // 2. enter raw terminal
   termios_mode(1);
 
-  // 4. send client type
+  // 3. send client type
   ClientType my_type = CLIENT_CLI;
   write(*server_fd, &my_type, sizeof(ClientType));
 
