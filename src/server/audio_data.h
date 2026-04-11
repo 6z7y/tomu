@@ -8,11 +8,11 @@
 #include <pthread.h>
 #include <stdint.h>
 #include "../../libs/miniaudio.h"
+#include "../shared/shared_control.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
-
 
 typedef struct {
     char *title;          // song name
@@ -23,7 +23,6 @@ typedef struct {
     char *date;           // releases time
     char *track;          // track number
 } Audio_Metadata;
-
 
 // struct handle Playback
 typedef struct {

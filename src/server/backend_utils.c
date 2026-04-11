@@ -4,13 +4,15 @@
 #include <dirent.h>
 #include <unistd.h>
 
+#include "audio_backend.h"
 #include "audio_data.h"
 #include "../../libs/miniaudio.h"
 #include "backend.h"
+#include "utils.h"
 #include "backend_utils.h"
 
 // function take from planar_value to get interleaved_value
-enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
+inline enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
 {
   switch (value){
     case AV_SAMPLE_FMT_DBLP: return AV_SAMPLE_FMT_DBL;
@@ -24,7 +26,7 @@ enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
 }
 
 // function take from interleaved_value get mini audio format
-ma_format get_ma_format(enum AVSampleFormat value)
+inline ma_format get_ma_format(enum AVSampleFormat value)
 {
   switch (value){
     case AV_SAMPLE_FMT_DBL: return ma_format_f32;
@@ -37,6 +39,37 @@ ma_format get_ma_format(enum AVSampleFormat value)
   }
 }
 
+// store information Audio file to Audio_Info structure
+inline void store_information(int audioStream_index, enum AVSampleFormat output_sample_fmt )
+{
+  Audio_Info *inf = &ctx.inf;
+
+  #ifdef LEGACY_LIBSWRSAMPLE
+    inf->ch = ctx.codecCTX->channels,
+    inf->ch_layout = ctx.codecCTX->channel_layout,
+  #else
+    inf->ch = ctx.codecCTX->ch_layout.nb_channels,
+    inf->ch_layout = ctx.codecCTX->ch_layout,
+  #endif
+
+  inf->audioStream_index = audioStream_index;
+  inf->audioStream = ctx.fmtCTX->streams[audioStream_index];
+  inf->sample_rate = ctx.codecCTX->sample_rate,
+  inf->sample_fmt = output_sample_fmt,
+  inf->sample_fmt_bytes = av_get_bytes_per_sample(inf->sample_fmt),
+  inf->ma_fmt = get_ma_format(output_sample_fmt);
+}
+
+// fn to search correct stream you want
+int get_audio_stream()
+{
+  for_each_num(ctx.fmtCTX->nb_streams) {
+    AVStream *stream = ctx.fmtCTX->streams[i];
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO ) return i;
+  }
+  return -1;
+}
+
 // reads the file and creates a Stream Context
 int get_audio_info(const char *filename)
 {
@@ -46,7 +79,7 @@ int get_audio_info(const char *filename)
     return -1;
   }
 
-  // Check about Streams exists?
+  // Checking about Streams exists
   if ( avformat_find_stream_info(ctx.fmtCTX, NULL) < 0 ) {
     warn("ffmpeg: cannot find any streams");
     return -1;
@@ -55,8 +88,9 @@ int get_audio_info(const char *filename)
   // get audioStream
   int audioStream_index = -1;
   audioStream_index = get_audio_stream();
+  printf("audio stream is %d\n", audioStream_index);
 
-  if ( audioStream_index == -1 ) {
+  if ( audioStream_index < 0 ) {
     warn("file: can't find AudioStream");
     return -1;
   }
@@ -95,38 +129,6 @@ int get_audio_info(const char *filename)
   store_information(audioStream_index, output_sample_fmt);
 
   return 0;
-}
-
-// fn to search correct stream you want
-int get_audio_stream()
-{
-  for (int i = 0; i < ctx.fmtCTX->nb_streams; i++){
-    AVStream *stream = ctx.fmtCTX->streams[i];
-    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO )
-      return i;
-  }
-  return -1;
-}
-
-// store information Audio file to Audio_Info structure
-void store_information(int audioStream_index, enum AVSampleFormat output_sample_fmt )
-{
-  Audio_Info *inf = &ctx.inf;
-
-  #ifdef LEGACY_LIBSWRSAMPLE
-    inf->ch = ctx.codecCTX->channels,
-    inf->ch_layout = ctx.codecCTX->channel_layout,
-  #else
-    inf->ch = ctx.codecCTX->ch_layout.nb_channels,
-    inf->ch_layout = ctx.codecCTX->ch_layout,
-  #endif
-
-  inf->audioStream_index = audioStream_index;
-  inf->audioStream = ctx.fmtCTX->streams[audioStream_index];
-  inf->sample_rate = ctx.codecCTX->sample_rate,
-  inf->sample_fmt = output_sample_fmt,
-  inf->sample_fmt_bytes = av_get_bytes_per_sample(inf->sample_fmt),
-  inf->ma_fmt = get_ma_format(output_sample_fmt);
 }
 
 
@@ -202,80 +204,6 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   pthread_cond_init(&state->wait_cond, NULL);
 }
 
-// void get_metadata()
-// {
-//   Audio_Metadata *metadata = &ctx.metadata;
-//
-//   AVDictionaryEntry *tag = NULL;
-//
-//   // printf("File tags:\n");
-//   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-//     // printf("  %s : %s\n", tag->key, tag->value);
-//   if      (!strcmp(tag->key, "title")) metadata->title = tag->value;
-//   else if (!strcmp(tag->key, "artist")) metadata->artist = tag->value;
-//   else if (!strcmp(tag->key, "album")) metadata->album = tag->value;
-//   else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = tag->value;
-//   else if (!strcmp(tag->key, "genre")) metadata->genre = tag->value;
-//   else if (!strcmp(tag->key, "date")) metadata->date = tag->value;
-//   else if (!strcmp(tag->key, "track")) metadata->track = tag->value;
-//   }
-// }
-
-// init miniaudio config before using
-ma_device_config init_miniaudioConfig(Audio_Info *inf)
-{
-  ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
-
-  ma_config.playback.channels = inf->ch;
-  ma_config.playback.format = inf->ma_fmt;
-  ma_config.sampleRate = inf->sample_rate;
-  ma_config.dataCallback = ma_dataCallback;
-  ma_config.pUserData = &ctx;
-
-  return ma_config;
-}
-
-Audio_Buffer *audio_buffer_init(int capacity)
-{
-  Audio_Buffer *buf = malloc(sizeof(Audio_Buffer));
-
-  buf->pcm_data = malloc(capacity);
-  buf->capacity = capacity;
-  buf->write_pos = 0;
-  buf->read_pos = 0;
-  buf->filled = 0;
-  buf->stopped = 0;
-
-  pthread_mutex_init(&buf->lock, NULL);
-  pthread_cond_init(&buf->data_ready, NULL);
-  pthread_cond_init(&buf->space_free, NULL);
-  return buf;
-}
-
-// Reset audio buffer to empty state (used after seeking to discard old audio)
-void audio_buffer_reset()
-{
-  pthread_mutex_lock(&ctx.buf->lock);
-
-    ctx.buf->filled = 0;
-    ctx.buf->read_pos = 0;
-    ctx.buf->write_pos = 0;
-    pthread_cond_broadcast(&ctx.buf->space_free);
-
-  pthread_mutex_unlock(&ctx.buf->lock);
-}
-
-void audio_buffer_destroy(Audio_Buffer *buf)
-{
-  if (buf ){
-    free(buf->pcm_data);
-    pthread_mutex_destroy(&buf->lock);
-    pthread_cond_destroy(&buf->data_ready);
-    pthread_cond_destroy(&buf->space_free);
-    free (ctx.buf);
-  }
-}
-
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
 {
   Audio_Info *inf = &ctx.inf;
@@ -312,3 +240,22 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   state->seek_target = 0;
   return;
 }
+
+// void get_metadata()
+// {
+//   Audio_Metadata *metadata = &ctx.metadata;
+//
+//   AVDictionaryEntry *tag = NULL;
+//
+//   // printf("File tags:\n");
+//   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+//     // printf("  %s : %s\n", tag->key, tag->value);
+//   if      (!strcmp(tag->key, "title")) metadata->title = tag->value;
+//   else if (!strcmp(tag->key, "artist")) metadata->artist = tag->value;
+//   else if (!strcmp(tag->key, "album")) metadata->album = tag->value;
+//   else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = tag->value;
+//   else if (!strcmp(tag->key, "genre")) metadata->genre = tag->value;
+//   else if (!strcmp(tag->key, "date")) metadata->date = tag->value;
+//   else if (!strcmp(tag->key, "track")) metadata->track = tag->value;
+//   }
+// }
