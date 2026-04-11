@@ -1,6 +1,7 @@
+.cache/
+build/
+test/
 tomu
 tomucli
 tomutui
 tomugui
-build/
-.cache/
