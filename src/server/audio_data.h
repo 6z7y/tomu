@@ -7,12 +7,31 @@
 #include <libswresample/swresample.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <poll.h>
+
 #include "../../libs/miniaudio.h"
 #include "../shared/shared_control.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
+
+// socket data
+typedef enum {
+  CLIENT_CLI,
+  CLIENT_TUI,
+  CLIENT_GUI,
+
+} ClientType;
+
+typedef struct {
+  struct pollfd pfd; // for event if pressed key
+  ClientType type;   // type client (because tui & gui will have cover img later)
+  int fd;            // fd for client
+  int active;        // for make listent the client mode
+
+} Client_connection;
+// -----------------------------
 
 typedef struct {
     char *title;          // song name
@@ -22,6 +41,7 @@ typedef struct {
     char *genre;          // classification
     char *date;           // releases time
     char *track;          // track number
+
 } Audio_Metadata;
 
 // struct handle Playback
@@ -40,6 +60,7 @@ typedef struct {
   int ready;
   pthread_mutex_t lock;
   pthread_cond_t wait_cond;
+
 } Audio_State;
 
 typedef struct {
@@ -52,6 +73,7 @@ typedef struct {
   pthread_mutex_t lock;
   pthread_cond_t data_ready;
   pthread_cond_t space_free;
+
 } Audio_Buffer;
 
 // struct for base information of audio file (codec)
@@ -68,24 +90,26 @@ typedef struct {
   enum AVSampleFormat sample_fmt;
   int sample_fmt_bytes;
   ma_format ma_fmt;
+
 } Audio_Info;
 
 
 // struct for point context used in another functions (needed)
 typedef struct PlayBackContext{
-  int server_fd;
-  int client_fd;
-  Audio_Metadata metadata;
-  Audio_State state;
-  Audio_Buffer *buf;
-  Audio_Info inf;
-  int playback_active;
-  char *queue_list[200];
-  int queue_count;   // how many paths in queue
-  int queue_index;   // which one is currently playing
   pthread_t playback_thread;
   AVFormatContext *fmtCTX;
   AVCodecContext *codecCTX;
+  Audio_Metadata metadata;
+  Audio_Buffer *buf;
+  Audio_State state;
+  Audio_Info inf;
+  char *queue_list[200];
+  int queue_count;   // how many paths in queue
+  int queue_index;   // which one is currently playing
+  int playback_active;
+  int server_fd;
+  int client_fd;
+
 } PlayBackContext;
 
 extern PlayBackContext ctx;
