@@ -2,7 +2,7 @@
 #include <unistd.h>
 
 #include "backend.h"
-#include "../share_backend.h"
+#include "../shared/share_backend.h"
 
 void print_header(const char *filename)
 {

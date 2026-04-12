@@ -4,10 +4,15 @@
 
 #include "control.h"
 #include "utils.h"
-#include "../share_backend.h"
+#include "../shared/share_backend.h"
 
 inline void send_cmd(int *server_fd, Command cmd)
 { write(*server_fd, &cmd, sizeof(Command)); }
+
+typedef struct {
+  char *key; // stdin (keyborard keys)
+  Command cmd; // Command enum send to server and will parse it
+} KeyMap;
 
 static const KeyMap keymap[] = {
 //    KEY             EXEC

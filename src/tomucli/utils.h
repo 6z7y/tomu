@@ -9,8 +9,4 @@ void socket_mode(int *server_fd, int mode);
 void termios_mode(int mode);
 int args_handle(const char *option);
 
-// void verr(const char *fmt, va_list ap);
-// void warn(const char *fmt, ...);
-// void die(const char *fmt, ...);
-
 #endif

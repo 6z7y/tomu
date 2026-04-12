@@ -8,7 +8,9 @@
 
 #include "socket_utils.h"
 #include "control.h"
+
 #include "utils.h"
+#include "../shared/share_utils.h"
 
 static inline void client_die(int i, Client_connection *client)
 {

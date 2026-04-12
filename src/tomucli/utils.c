@@ -8,8 +8,8 @@
 #include <stdarg.h>
 
 #include "utils.h"
-#include "../share_backend.h"
-#include "../../shared/share_info.h"
+#include "../shared/share_backend.h"
+#include "../shared/share_info.h"
 
 
 void sig_clean(int sig)

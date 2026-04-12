@@ -13,9 +13,9 @@
 #include "backend.h"
 #include "control.h"
 #include "utils.h"
-#include "../share_backend.h"
-#include "../share_data.h"
-#include "../../shared/shared_control.h"
+#include "../shared/share_backend.h"
+#include "../shared/share_data.h"
+#include "../shared/shared_control.h"
 
 // init client ctx
 Client_CTX client_ctx = {0};

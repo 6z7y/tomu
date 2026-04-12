@@ -7,8 +7,8 @@
 #include <termios.h>
 #include <stdarg.h>
 
-#include "../share_backend.h"
-#include "../../shared/share_info.h"
+#include "../shared/share_backend.h"
+#include "../shared/share_info.h"
 
 // arg compare opts
 static const char *help_opts[] = {"--help", "-h", NULL};    // help

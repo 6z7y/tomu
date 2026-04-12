@@ -6,6 +6,7 @@
 
 #include "control.h"
 #include "../shared/share_info.h"
+#include "../shared/share_utils.h"
 
 // minimal functions
 #define write_socket_normal_msg(socket, msg) write(socket, msg, strlen(msg)) // write to client normal msg
@@ -22,8 +23,8 @@
 void sig_clean(int sig);
 void cleanUP();
 
-void verr(const char *fmt, va_list ap);
-void warn(const char *fmt, ...);
-void die(const char *fmt, ...);
+// void verr(const char *fmt, va_list ap);
+// void warn(const char *fmt, ...);
+// void die(const char *fmt, ...);
 
 #endif

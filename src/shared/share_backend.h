@@ -10,11 +10,6 @@
 #include "share_data.h"
 #include "../shared/shared_control.h"
 
-typedef struct {
-  char *key; // stdin (keyborard keys)
-  Command cmd; // Command enum send to server and will parse it
-} KeyMap;
-
 void send_next_from_queue(int server_fd, PlaybackQueue *queue);
 void handle_playback_complete(int server_fd, PlaybackQueue *queue);
 void path_handle(int server_fd, const char *path, PlaybackQueue *queue);

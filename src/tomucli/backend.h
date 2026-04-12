@@ -1,7 +1,7 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
-#include "../../shared/shared_control.h"
+#include "../shared/shared_control.h"
 
 
 void print_header(const char *filename);
