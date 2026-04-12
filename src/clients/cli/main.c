@@ -9,6 +9,7 @@
 #include <termios.h>
 #include <signal.h>
 
+#include "args.h"
 #include "backend.h"
 #include "control.h"
 #include "utils.h"
@@ -24,7 +25,7 @@ int main(int argc, char **argv)
   signal(SIGINT, sig_clean); // when prog close by ctrl+c
 
   // check args
-  if (args_handle(argv[argc - 1]) == 1) goto bye;
+  if (args_handle(argv[argc-1])) goto bye;
   printf("\033[?25l"); // hide cursor
 
   int *server_fd = &client_ctx.server_fd; // socket fd session between server
@@ -33,14 +34,14 @@ int main(int argc, char **argv)
   // 1. connect to server
   socket_mode(server_fd, 1);
 
-  // 2. enter raw terminal
-  termios_mode(1);
-
-  // 3. send client type
+  // 2. send client type
   ClientType my_type = CLIENT_CLI;
   write(*server_fd, &my_type, sizeof(ClientType));
 
-  // 5. check path
+  // 3. enter raw terminal
+  termios_mode(1);
+
+  // 4. check path
   if (argc == 2) path_handle(*server_fd, argv[argc-1], queue);
 
   TomuStatus status = {0};
@@ -107,14 +108,15 @@ int main(int argc, char **argv)
       }
   }
 
-  termios_mode(0);
-  socket_mode(&*server_fd, 0);
 
   // if (queue->has_queue) {
   //     for (int i = 0; i < queue->dir.totalFiles; i++)
   //         free(queue->dir.files[i]);
   //     free(queue->dir.files);
   // }
+
+  termios_mode(0);
+  socket_mode(&*server_fd, 0);
 
 bye:
   return 0;
