@@ -22,10 +22,6 @@
 void sig_clean(int sig);
 void cleanUP();
 
-void socket_mode(int mode, int *server_fd);
-
-int args_handle(const char *option);
-
 void verr(const char *fmt, va_list ap);
 void warn(const char *fmt, ...);
 void die(const char *fmt, ...);
