@@ -211,11 +211,16 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 {
   av_log_set_level(AV_LOG_QUIET); // ignore warning
 
+  // 1. Read file audio
   if (get_audio_info(filename) < 0) return -1;
 
-  // 2. initialize a buffer, size = 500ms (Streaming mode)
-  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.5;
+  get_metadata(); // get metadata
+  extract_cover(filename); // extract cover img 
+
+  // initialize a buffer, size = 500ms (Streaming mode)
+  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.8;
   ctx.buf = audio_buffer_init(capacity);
+
 
   // 3. init miniaudio device
   ma_device device;
