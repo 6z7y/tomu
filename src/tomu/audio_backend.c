@@ -86,6 +86,19 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
 {
   Audio_Info *inf = &ctx.inf;
   Audio_State *state = &ctx.state;
+
+    // Check pause state
+    pthread_mutex_lock(&state->lock);
+    while (state->paused)
+      pthread_cond_wait(&state->wait_cond, &state->lock);
+      
+    // if (state->running == false) break;
+    // progress(state, current_time, duration_sec);
+    pthread_mutex_unlock(&state->lock);
+
+  pthread_mutex_lock(&ctx.buf->lock);
+  ctx.buf->stopped = 1;
+  pthread_mutex_unlock(&ctx.buf->lock);
   
   int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
   audio_buffer_read(ctx.buf, output, bytes);
