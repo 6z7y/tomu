@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 #include "audio_backend.h"
-#include "audio_data.h"
+#include "DATA.h"
 #include "backend.h"
 #include "backend_utils.h"
 #include "utils.h"
@@ -22,7 +22,6 @@
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
-PlayBackContext ctx = {0};
 
 // decoder thread
 void *run_decoder(void *arg)
@@ -212,7 +211,6 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 {
   av_log_set_level(AV_LOG_QUIET); // ignore warning
 
-  // 1. get file information
   if (get_audio_info(filename) < 0) return -1;
 
   // 2. initialize a buffer, size = 500ms (Streaming mode)

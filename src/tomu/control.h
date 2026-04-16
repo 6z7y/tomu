@@ -1,7 +1,7 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
-#include "audio_data.h"
+#include "DATA.h"
 #include "../shared/shared_control.h"
 
 void send_cmd(int sock, Command cmd);

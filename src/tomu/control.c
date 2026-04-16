@@ -7,7 +7,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "audio_data.h"
 #include "control.h"
 
 

@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "audio_data.h"
+#include "DATA.h"
 #include "backend.h"
 
 #include "../../libs/miniaudio.h"
@@ -43,7 +43,7 @@ void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_wr
 }
 
 // READ AUDIO DATA FROM BUFFER TO SPEAKER
-void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
+static void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 {
   pthread_mutex_lock(&buf->lock);
   

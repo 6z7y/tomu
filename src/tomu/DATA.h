@@ -1,12 +1,11 @@
-#ifndef AUDIO_DATA_H
-#define AUDIO_DATA_H
+#ifndef DATA_H
+#define DATA_H
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 #include <pthread.h>
-#include <stdint.h>
 #include <poll.h>
 
 #include "../../libs/miniaudio.h"
@@ -46,6 +45,7 @@ typedef struct {
 
 // struct handle Playback
 typedef struct {
+  Audio_Metadata metadata;
   int running;
   int paused;
   int duration;
@@ -96,13 +96,12 @@ typedef struct {
 
 // struct for point context used in another functions (needed)
 typedef struct PlayBackContext{
-  pthread_t playback_thread;
-  AVFormatContext *fmtCTX;
-  AVCodecContext *codecCTX;
-  Audio_Metadata metadata;
+  AVFormatContext *fmtCTX; // Structure audio file
+  AVCodecContext *codecCTX; // decoder running
   Audio_Buffer *buf;
   Audio_State state;
-  Audio_Info inf;
+  Audio_Info inf; // information audio
+  pthread_t playback_thread;
   char *queue_list[200];
   int queue_count;   // how many paths in queue
   int queue_index;   // which one is currently playing
