@@ -1,7 +1,7 @@
 CC           := cc
 CFLAGS       := -Wall -g -O3 -Iinclude
 LIBS         := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil
-INSTALL_PATH := /usr/bin
+INSTALL_PATH := /usr/local/bin
 OBJECT_BUILD_DIR    := build
 
 # names
@@ -86,6 +86,11 @@ clean:
 
 # uninstall
 uninstall:
+	sudo rm -f /usr/bin/$(TOMU_NAME)
+	sudo rm -f /usr/bin/$(TOMUCLI_NAME)
+	sudo rm -f /usr/bin/$(TOMUTUI_NAME)
+	sudo rm -f /usr/bin/$(TOMUGUI_NAME)
+
 	sudo rm -f $(INSTALL_PATH)/$(TOMU_NAME)
 	sudo rm -f $(INSTALL_PATH)/$(TOMUCLI_NAME)
 	sudo rm -f $(INSTALL_PATH)/$(TOMUTUI_NAME)
