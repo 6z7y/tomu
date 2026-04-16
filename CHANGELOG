@@ -1,4 +1,27 @@
-# 6z7y 1.0.6_1_beta - 2026-03-XX
+# 6z7y 1.0.7_beta - 2026-04-17
+Major changes:
+- change files structure
+- add tomutui & tomugui basic (not ready yet)
+- refactor: reorganize src directory structure
+  -- split server/ and clients/ into per-binary directories (tomu/, tomucli/, tomutui/, tomugui/)
+
+* tomu:
+  - rename audio_data.h to DATA.h
+  - move args handling to args.c
+  - refactor playback context
+  - simplify main loop and poll logic
+  - Fix audio pause delay with condition variable
+  - improve status broadcast (only when state.running is true)
+  - add metadata reading support (title, artist, album, etc.)
+  - add embedded cover image extraction
+  -- cover images saved to /tmp/tomu_cover_img/[filename].png
+
+* tomucli:
+  - move args handling to args.c
+  - send client type before raw mode
+  - improve init and cleanup order
+
+# 6z7y 1.0.6_1_beta - 2026-04-11
 * tomu: 
   - move get_info() from backend.c to backend_utils.c
   - move audio buffer (read/write) and miniaudio callback to audio_backend.c
