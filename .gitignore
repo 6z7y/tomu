@@ -1,7 +1,7 @@
-.cache/
-build/
-test/
-tomu
-tomucli
-tomutui
-tomugui
+/.cache/
+/build/
+/tomu
+/tomucli
+/tomutui
+/tomugui
+/test/

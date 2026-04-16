@@ -1,77 +1,94 @@
-# core option installer
-CC := cc
-CFLAGS := -Wall -g -O3 -Iinclude
-LIBS := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil
-
-#Paths
+CC           := cc
+CFLAGS       := -Wall -g -O3 -Iinclude
+LIBS         := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil
 INSTALL_PATH := /usr/bin
-BUILD_DIR := build
+OBJECT_BUILD_DIR    := build
 
-# (Server)
-SERVER_NAME := tomu
-SERVER_DIR := src/server
-SERVER_BUILD_DIR := $(BUILD_DIR)/server
-SERVER_SOURCES := $(wildcard $(SERVER_DIR)/*.c)
-SERVER_OBJECTS := $(patsubst $(SERVER_DIR)/%.c, $(SERVER_BUILD_DIR)/%.o, $(SERVER_SOURCES))
+# names
+TOMU_NAME    := tomu
+TOMUCLI_NAME := tomucli
+TOMUTUI_NAME := tomutui
+TOMUGUI_NAME := tomugui
 
-# # cli (CLIENT)
-CLIENT_CLI_NAME := tomucli
-CLIENT_CLI_DIR := src/clients/cli src/clients
-CLIENT_CLI_BUILD_DIR := $(BUILD_DIR)/clients/cli
-# CLIENT_CLI_SOURCES := $(wildcard $(CLIENT_CLI_DIR)/*.c)
-# CLIENT_CLI_OBJECTS := $(patsubst $(CLIENT_CLI_DIR)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(CLIENT_CLI_SOURCES))
-CLIENT_CLI_DIRS := src/clients/cli src/clients
-CLIENT_CLI_SOURCES := $(foreach dir, $(CLIENT_CLI_DIRS), $(wildcard $(dir)/*.c))
-CLIENT_CLI_OBJECTS := $(foreach dir, $(CLIENT_CLI_DIRS), \
-    $(patsubst $(dir)/%.c, $(CLIENT_CLI_BUILD_DIR)/%.o, $(wildcard $(dir)/*.c)))
-#
-# # tui (CLIENT)
-# CLIENT_TUI_NAME := tomutui
-# CLIENT_TUI_DIR := src/clients/tui
-# CLIENT_TUI_BUILD_DIR := $(BUILD_DIR)/clients/tui
-# CLIENT_TUI_SOURCES := $(wildcard $(CLIENT_TUI_DIR)/*.c)
-# CLIENT_TUI_OBJECTS := $(patsubst $(CLIENT_TUI_DIR)/%.c, $(CLIENT_TUI_BUILD_DIR)/%.o, $(CLIENT_TUI_SOURCES))
+# dirs
+TOMU_DIR    := src/tomu
+TOMUCLI_DIR := src/tomucli
+TOMUTUI_DIR := src/tomutui
+TOMUGUI_DIR := src/tomugui
+SHARED_DIR  := src/shared
 
-# TODO: later
-# CLIENT_GUI_SRC_PATH := src/clients/gui
+# build dirs
+TOMU_BUILD_DIR    := $(OBJECT_BUILD_DIR)/tomu
+TOMUCLI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomucli
+TOMUTUI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomutui
+TOMUGUI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomugui
+SHARED_BUILD_DIR  := $(OBJECT_BUILD_DIR)/shared
 
-all: $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME)
+# sources
+TOMU_SRC    := $(wildcard $(TOMU_DIR)/*.c)
+TOMUCLI_SRC := $(wildcard $(TOMUCLI_DIR)/*.c)
+TOMUTUI_SRC := $(wildcard $(TOMUTUI_DIR)/*.c)
+TOMUGUI_SRC := $(wildcard $(TOMUGUI_DIR)/*.c)
+SHARED_SRC  := $(wildcard $(SHARED_DIR)/*.c)
 
-$(SERVER_NAME): $(SERVER_OBJECTS)
-	$(CC) $(SERVER_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
+# objects
+TOMU_OBJECTS    := $(patsubst $(TOMU_DIR)/%.c, $(TOMU_BUILD_DIR)/%.o, $(TOMU_SRC))
+TOMUCLI_OBJECTS := $(patsubst $(TOMUCLI_DIR)/%.c, $(TOMUCLI_BUILD_DIR)/%.o, $(TOMUCLI_SRC))
+TOMUTUI_OBJECTS := $(patsubst $(TOMUTUI_DIR)/%.c, $(TOMUTUI_BUILD_DIR)/%.o, $(TOMUTUI_SRC))
+TOMUGUI_OBJECTS := $(patsubst $(TOMUGUI_DIR)/%.c, $(TOMUGUI_BUILD_DIR)/%.o, $(TOMUGUI_SRC))
+SHARED_OBJECTS  := $(patsubst $(SHARED_DIR)/%.c, $(SHARED_BUILD_DIR)/%.o, $(SHARED_SRC))
 
-$(CLIENT_CLI_NAME): $(CLIENT_CLI_OBJECTS) $(SERVER_OBJECTS)
-	$(CC) $(CLIENT_CLI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
-#
-# $(CLIENT_TUI_NAME): $(CLIENT_TUI_OBJECTS)
-# 	$(CC) $(CLIENT_TUI_OBJECTS) -o $@ $(CFLAGS) $(LIBS)
+# build all
+all: $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUTUI_NAME) $(TOMUGUI_NAME)
+
+# linking (IMPORTANT: include shared objects)
+$(TOMU_NAME): $(TOMU_OBJECTS) $(SHARED_OBJECTS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
+
+$(TOMUCLI_NAME): $(TOMUCLI_OBJECTS) $(SHARED_OBJECTS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
+
+$(TOMUTUI_NAME): $(TOMUTUI_OBJECTS) $(SHARED_OBJECTS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
+
+$(TOMUGUI_NAME): $(TOMUGUI_OBJECTS) $(SHARED_OBJECTS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
 
 
-$(SERVER_BUILD_DIR)/%.o: $(SERVER_DIR)/%.c
+# compile rules (per folder)
+$(TOMU_BUILD_DIR)/%.o: $(TOMU_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(CLIENT_CLI_BUILD_DIR)/%.o: src/clients/cli/%.c
+$(TOMUCLI_BUILD_DIR)/%.o: $(TOMUCLI_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(CLIENT_CLI_BUILD_DIR)/%.o: src/clients/%.c
+$(TOMUTUI_BUILD_DIR)/%.o: $(TOMUTUI_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
-#
-# $(CLIENT_TUI_BUILD_DIR)/%.o: $(CLIENT_TUI_DIR)/%.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) -c $< -o $@ $(CFLAGS)
 
+$(TOMUGUI_BUILD_DIR)/%.o: $(TOMUGUI_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+$(SHARED_BUILD_DIR)/%.o: $(SHARED_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+# install
 install: all
-	sudo install -m755 $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME) $(INSTALL_PATH)
+	sudo install -m755 $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUTUI_NAME) $(TOMUGUI_NAME) $(INSTALL_PATH)
 
+# clean
 clean:
-	rm -rf $(SERVER_NAME) $(CLIENT_CLI_NAME) $(CLIENT_TUI_NAME) $(BUILD_DIR)
+	rm -rf $(OBJECT_BUILD_DIR) $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUGUI_NAME) $(TOMUTUI_NAME)
 
+# uninstall
 uninstall:
-	sudo rm -f $(INSTALL_PATH)/$(SERVER_NAME)
-	sudo rm -f $(INSTALL_PATH)/$(CLIENT_CLI_NAME)
-	# sudo rm -f $(INSTALL_PATH)/$(CLIENT_TUI_NAME)
+	sudo rm -f $(INSTALL_PATH)/$(TOMU_NAME)
+	sudo rm -f $(INSTALL_PATH)/$(TOMUCLI_NAME)
+	sudo rm -f $(INSTALL_PATH)/$(TOMUTUI_NAME)
+	sudo rm -f $(INSTALL_PATH)/$(TOMUGUI_NAME)
 
-.PHONY: all install uninstall clean
+.PHONY: all install clean uninstall
