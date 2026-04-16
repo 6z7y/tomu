@@ -14,12 +14,13 @@ void verr(const char *fmt, va_list ap)
 	}
 }
 
-void warn(const char *fmt, ...)
+int warn(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
 	verr(fmt, ap);
     va_end(ap);
+  return -1;
 }
 
 void die(const char *fmt, ...)
