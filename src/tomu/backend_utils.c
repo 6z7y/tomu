@@ -3,12 +3,11 @@
 #include <libavutil/avutil.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
-#include "audio_backend.h"
-#include "audio_data.h"
 #include "../../libs/miniaudio.h"
+#include "audio_backend.h"
 #include "backend.h"
-#include "utils.h"
 #include "backend_utils.h"
 
 // function take from planar_value to get interleaved_value
@@ -40,7 +39,7 @@ inline ma_format get_ma_format(enum AVSampleFormat value)
 }
 
 // store information Audio file to Audio_Info structure
-inline void store_information(int audioStream_index, enum AVSampleFormat output_sample_fmt )
+static inline void store_information(int audioStream_index, enum AVSampleFormat sample_fmt )
 {
   Audio_Info *inf = &ctx.inf;
 
@@ -55,82 +54,80 @@ inline void store_information(int audioStream_index, enum AVSampleFormat output_
   inf->audioStream_index = audioStream_index;
   inf->audioStream = ctx.fmtCTX->streams[audioStream_index];
   inf->sample_rate = ctx.codecCTX->sample_rate,
-  inf->sample_fmt = output_sample_fmt,
+  inf->sample_fmt = sample_fmt,
   inf->sample_fmt_bytes = av_get_bytes_per_sample(inf->sample_fmt),
-  inf->ma_fmt = get_ma_format(output_sample_fmt);
+  inf->ma_fmt = get_ma_format(sample_fmt);
 }
 
-// fn to search correct stream you want
-int get_audio_stream()
+// function for search audio stream
+inline int get_audioStream()
 {
-  for_each_num(ctx.fmtCTX->nb_streams) {
-    AVStream *stream = ctx.fmtCTX->streams[i];
-    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO ) return i;
+  for_each_num(ctx.fmtCTX->nb_streams) { // loop by number streams
+    AVStream *stream = ctx.fmtCTX->streams[i]; // select index stream between 0..nb_stream
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) { // this index is audio stream?
+      return i; // (yes) return index
+    }
   }
-  return -1;
+  return -1; // (no) error
+}
+
+int init_decoder(AVCodecContext *codecCTX, const AVCodecParameters *codecPAR, const AVCodec *codecTYPE)
+{
+
+  avcodec_parameters_to_context(codecCTX, codecPAR); // copy codec information to decoder
+
+  // initialize decoder with actual codec
+  if (avcodec_open2(ctx.codecCTX, codecTYPE, NULL) < 0) {
+    return warn("ffmpeg: cannot open codec!");
+  }
+
+  return 0;
 }
 
 // reads the file and creates a Stream Context
 int get_audio_info(const char *filename)
 {
-  // Read File
-  if ( avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0 ) {
-    warn("ffmpeg: file type is not supported");
-    return -1;
-  }
+  // | Container
+  if (avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0) {
+    return warn("ffmpeg: can't read audio file");
+  } // Get File Structure and store it in fmtCTX
 
-  // Checking about Streams exists
-  if ( avformat_find_stream_info(ctx.fmtCTX, NULL) < 0 ) {
-    warn("ffmpeg: cannot find any streams");
-    return -1;
-  }
+  // || Container -> Streams
+  if (avformat_find_stream_info(ctx.fmtCTX, NULL) < 0) {
+    return warn("ffmpeg: can't find any streams");
+  } // checking any streams in audio Structure
 
-  // get audioStream
-  int audioStream_index = -1;
-  audioStream_index = get_audio_stream();
-  printf("audio stream is %d\n", audioStream_index);
+  int audioStream_index = get_audioStream();
+  if (audioStream_index < 0) {
+    return warn("can't find audioStream");
+  } // Search audio Stream
 
-  if ( audioStream_index < 0 ) {
-    warn("file: can't find AudioStream");
-    return -1;
-  }
+  // ||| Container -> Stream[Audio_Stream] -> Codec
+  const AVCodecParameters *codecPAR = ctx.fmtCTX->streams[audioStream_index]->codecpar; // selected codec in audio stream
+  const AVCodec *codecTYPE = avcodec_find_decoder(codecPAR->codec_id);
+  if ( !codecTYPE ) {
+    return warn("ffmpeg: unsupported codec id %d");
+  } // select correct decoder type
 
-  // get information codec about audio stream
-  const AVCodecParameters *codecPAR = ctx.fmtCTX->streams[audioStream_index]->codecpar;
-  const AVCodec *codecID = avcodec_find_decoder(codecPAR->codec_id); // get correct codec id for decoder
-
-  // allocate empty decoder
-  ctx.codecCTX = avcodec_alloc_context3(codecID);
-
+  ctx.codecCTX = avcodec_alloc_context3(codecTYPE);
   if ( !ctx.codecCTX ) {
-    warn("ffmpeg: failed allocate codec!");
-    return -1;
-  }
+    return warn("ffmpeg: failed allocate codec!");
+  } // allocate codecCTX=Decoder
 
-  // Copy codec information to decoder context
-  avcodec_parameters_to_context(ctx.codecCTX, codecPAR);
+  if (init_decoder(ctx.codecCTX, codecPAR, codecTYPE) < 0) {
+    return warn("ffmpeg: can't init decoder");
+  } // init the decoder engin
 
-  // initialize decoder with actual codec
-  if (avcodec_open2(ctx.codecCTX, codecID, NULL) < 0) {
-    warn("ffmpeg: failed init decoder!");
-    return -1;
-
-  }
-
-  // Speakers need INTERLEAVED format! Convert PLANAR to INTERLEAVED if needed.
-  enum AVSampleFormat input_sample_fmt = ctx.codecCTX->sample_fmt;
-  enum AVSampleFormat output_sample_fmt = input_sample_fmt;
-  
-  if ( av_sample_fmt_is_planar(input_sample_fmt) ){
-    output_sample_fmt = get_interleaved(input_sample_fmt);
-  }
+  enum AVSampleFormat sample_fmt = ctx.codecCTX->sample_fmt;
+  if (av_sample_fmt_is_planar(sample_fmt)) {
+    sample_fmt = get_interleaved(sample_fmt);
+  } // if sample format is planar swap it to get interleaved type
 
   // Store audio info to a struct audio
-  store_information(audioStream_index, output_sample_fmt);
+  store_information(audioStream_index, sample_fmt);
 
   return 0;
 }
-
 
 // Setup SWR context convert
 int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
@@ -241,21 +238,97 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   return;
 }
 
-// void get_metadata()
-// {
-//   Audio_Metadata *metadata = &ctx.metadata;
-//
-//   AVDictionaryEntry *tag = NULL;
-//
-//   // printf("File tags:\n");
-//   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-//     // printf("  %s : %s\n", tag->key, tag->value);
-//   if      (!strcmp(tag->key, "title")) metadata->title = tag->value;
-//   else if (!strcmp(tag->key, "artist")) metadata->artist = tag->value;
-//   else if (!strcmp(tag->key, "album")) metadata->album = tag->value;
-//   else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = tag->value;
-//   else if (!strcmp(tag->key, "genre")) metadata->genre = tag->value;
-//   else if (!strcmp(tag->key, "date")) metadata->date = tag->value;
-//   else if (!strcmp(tag->key, "track")) metadata->track = tag->value;
-//   }
-// }
+void get_metadata()
+{
+  Audio_Metadata *metadata = &ctx.state.metadata;
+  AVDictionaryEntry *tag = NULL;
+
+  printf("File tags:\n");
+  while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+    printf("  %s : %s\n", tag->key, tag->value);
+
+    if      (!strcmp(tag->key, "title")) metadata->title = strdup(tag->value);
+    else if (!strcmp(tag->key, "artist")) metadata->artist = strdup(tag->value);
+    else if (!strcmp(tag->key, "album")) metadata->album = strdup(tag->value);
+    else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = strdup(tag->value);
+    else if (!strcmp(tag->key, "genre")) metadata->genre = strdup(tag->value);
+    else if (!strcmp(tag->key, "date")) metadata->date = strdup(tag->value);
+    else if (!strcmp(tag->key, "track")) metadata->track = strdup(tag->value);
+  }
+}
+
+
+///////////////////////////////////////////////////// about extract cover img
+int make_dir(const char *path) {
+    if (mkdir(path, 0755) == 0) {
+        return 0; // created
+    }
+
+    if (errno == EEXIST) {
+        return 0; // already exists (this is OK)
+    }
+
+    return 1; // error
+}
+// helper: extract filename without path and extension
+static void build_output_path(const char *input, char *out, size_t size) {
+    const char *base = strrchr(input, '/');
+    base = (base) ? base + 1 : input;
+
+    char name[256];
+    strncpy(name, base, sizeof(name));
+    name[sizeof(name) - 1] = '\0';
+
+    // remove extension
+    char *dot = strrchr(name, '.');
+    if (dot) *dot = '\0';
+
+    snprintf(out, size, "/tmp/tomu_cover_img/%s.png", name);
+}
+
+int get_cover(AVFormatContext *fmt, const char *input) {
+    char output[512];
+
+    build_output_path(input, output, sizeof(output));
+
+    printf("Saving to: %s\n", output);
+
+    make_dir("/tmp/tomu_cover_img");
+
+    // 🔥 NEW: skip if file already exists
+    if (access(output, F_OK) == 0) {
+        printf("File already exists, skipping...\n");
+        return 0;
+    }
+
+    for (unsigned int i = 0; i < fmt->nb_streams; i++) {
+        AVStream *stream = fmt->streams[i];
+
+        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+
+            AVPacket pkt = stream->attached_pic;
+
+            FILE *f = fopen(output, "wb");
+            if (!f) {
+                printf("Could not create output file\n");
+                return 1;
+            }
+
+            fwrite(pkt.data, 1, pkt.size, f);
+            fclose(f);
+
+            printf("Cover saved successfully\n");
+            return 0;
+        }
+    }
+
+    printf("No cover found\n");
+    return 1;
+}
+
+int extract_cover(const char *input) {
+    if (get_cover(ctx.fmtCTX, input) == 0) return 0;
+
+    printf("No cover found\n");
+    return 1;
+}
