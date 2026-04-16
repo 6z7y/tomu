@@ -6,17 +6,14 @@
 #include <libavutil/dict.h>
 #include "../../libs/miniaudio.h"
 
-#include "audio_data.h"
+#include "DATA.h"
 #include "backend.h"
 #include "control.h"
 #include "../shared/share_info.h"
 
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value);
-ma_format get_ma_format(enum AVSampleFormat value);
 
 int get_audio_info(const char *filename);
-int get_audio_stream();
-
 int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX);
 void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX);
 void init_playbackstatus(Audio_State *state, uint loop, uint shuffle);
