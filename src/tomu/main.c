@@ -2,10 +2,12 @@
 #include <poll.h>
 #include <signal.h>
 
-#include "audio_data.h"
+#include "DATA.h"
 #include "args.h"
 #include "socket_utils.h"
 #include "utils.h"
+
+PlayBackContext ctx = {0}; // tomu_context
 
 int main(int argc, char **argv)
 {
@@ -33,24 +35,20 @@ int main(int argc, char **argv)
     int nfds = add_client_into_poll(fds, client); // number clients active now
 
     // 5. start poll mode
-    int ret = poll(fds, nfds, 100); // 100ms timeout for update status
-
-    // send status struct to clients
-    if (ret == 0) {
-      if (ctx.playback_active) broadcast_status(client);
-      continue;
-    }
+    poll(fds, nfds, 100);
 
     // Accept new Client
     if (fds[0].revents & POLLIN) accept_new_client(server_fd, client_fd, client);
 
-    // check event control
-    client_checker_event(nfds, fds, client);
+    client_checker_event(nfds, fds, client); // check event control
+
+    if (ctx.state.running) {
+      broadcast_status(client); // update status when play audio
+    }
   }
 
-  // 11. close socket
+  // close socket
   socket_mode(0, &ctx.server_fd);
 
-bye:
-  return 0;
+bye: return 0;
 }
