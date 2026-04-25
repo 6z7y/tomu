@@ -2,7 +2,7 @@
 #define BACKEND_H
 
 #include "utils.h"
-#include "../shared/share_info.h"
+#include "../shared/SHARE_DATA.h"
 #include "../../libs/miniaudio.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3

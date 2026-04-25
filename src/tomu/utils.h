@@ -5,7 +5,7 @@
 #include <libavformat/avformat.h>
 
 #include "control.h"
-#include "../shared/share_info.h"
+#include "../shared/SHARE_DATA.h"
 #include "../shared/share_utils.h"
 
 

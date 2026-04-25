@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../shared/share_info.h"
+#include "../shared/SHARE_DATA.h"
 #include "utils.h"
 
 // arg compare opts
