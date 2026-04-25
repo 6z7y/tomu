@@ -16,7 +16,6 @@
 #include "config.h"
 #include "control.h"
 #include "file_handle.h"
-#include "socket_utils.h"
 #include "utils.h"
 #include "../shared/SHARE_DATA.h"
 #include "../shared/shared_control.h"
