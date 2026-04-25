@@ -1,14 +1,19 @@
-#ifndef SHARE_DATA
-#define SHARE_DATA
+#ifndef CLIENT_DATA_H
+#define CLIENT_DATA_H
 
-typedef enum {
-  CLIENT_CLI,
-  CLIENT_TUI,
-  CLIENT_GUI,
+// Config Structures
+typedef struct {
+  char done;
+  char current;
+  char remaining;
 
-} ClientType;
+} ProgressBarStyle;
 
-
+// structure config for client
+typedef struct {
+  ProgressBarStyle progress;
+} CONFIG;
+//----------------------------
 typedef struct {
   char** files;
   int totalFiles;
@@ -23,8 +28,9 @@ typedef struct {
 } PlaybackQueue;
 
 typedef struct {
-  int server_fd;
+  CONFIG cfg;
   PlaybackQueue queue;
+  int server_fd;
 } Client_CTX;
 
 extern Client_CTX client_ctx;
