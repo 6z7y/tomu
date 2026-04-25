@@ -2,7 +2,9 @@
 #include <unistd.h>
 
 #include "backend.h"
-#include "../shared/share_backend.h"
+#include "../shared/share_utils.h"
+#include "CLIENT_DATA.h"
+
 
 void print_header(const char *filename)
 {
@@ -16,14 +18,18 @@ void progress(TomuStatus *status, double current_time, int duration_time)
 {
   if (duration_time == 0) return;
 
+  char done = client_ctx.cfg.progress.done;
+  char current = client_ctx.cfg.progress.current;
+  char remaining = client_ctx.cfg.progress.remaining;
+
   int bar_width = 32;
   int pos = (int)((current_time / duration_time) * bar_width);
     printf("\033[2K\r");              // clear current line, carriage return
   printf("\r%s[", status->paused ? " (Paused) " : "");
   for (int i = 0; i < bar_width; i++) {
-    if      (i < pos)  printf("=");
-    else if (i == pos) printf(">");
-    else               printf(".");
+    if      (i < pos)  printf("%c", done);
+    else if (i == pos) printf("%c", current);
+    else               printf("%c", remaining);
   }
   printf("] %d:%02d:%02d / %d:%02d:%02d (~%.0f%%) | %.2fx v:%.0f%% s:%d l:%d",
     get_hour(current_time), get_min(current_time), get_sec(current_time),
