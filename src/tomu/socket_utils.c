@@ -8,11 +8,34 @@
 
 #include "socket_utils.h"
 #include "control.h"
-
-#include "utils.h"
 #include "../shared/share_utils.h"
 
-static inline void client_die(int i, Client_connection *client)
+// function used for write to socket
+// about arg mode (1=msg, 2=Struct_Status)
+static inline void write_sock(int fd, int mode, char *msgg, TomuStatus *status)
+{
+  if      (mode == 1) write(fd, msgg, strlen(msgg));
+  else if (mode == 2) write(fd, status, sizeof(TomuStatus));
+}
+
+// function used for reading from socket
+static inline void read_sock(int client_fd)
+{
+  char msg[256];
+  int r = read(client_fd, msg, sizeof(msg) - 1);
+
+  if (r > 0) {
+    msg[r] = 0;
+    printf("%s", msg);
+    fflush(stdout);
+  }
+  else if (r == 0) {printf("client dissconnect\n"); close(client_fd);}
+  else {perror("read");}
+}
+
+
+// function for kill client
+static inline void client_die(int i, CLIENTS_SYSTEM *client)
 {
   close(client[i].fd);
   client[i].fd = -1;
@@ -22,7 +45,7 @@ static inline void client_die(int i, Client_connection *client)
 }
 
 // add client active to poll struct
-int add_client_into_poll(struct pollfd *fds, Client_connection *client)
+int add_client_into_poll(struct pollfd *fds, CLIENTS_SYSTEM *client)
 {
   int nfds = 1; // begin from 1, because 0 for server
   for_each_num(MAX_CLIENT) {
@@ -34,7 +57,9 @@ int add_client_into_poll(struct pollfd *fds, Client_connection *client)
   return nfds; // number clients active
 }
 
-void broadcast_status(Client_connection *client)
+// function for send status for clients
+static TomuStatus status;
+void broadcast_status(CLIENTS_SYSTEM *client)
 {
   if (!ctx.playback_active || !ctx.state.ready) return;
 
@@ -50,21 +75,19 @@ void broadcast_status(Client_connection *client)
 
   for_each_num(MAX_CLIENT) {
     if (client[i].active) {
-      write(client[i].fd, &status, sizeof(status));
-        // client died while writing — clean up
-        // printf("jhhhhhhhhhh here in broadcaststatus\n");
-        // client_die(i, client);
-      // }
+      write_sock(client[i].fd, 2, NULL, &status);
     }
   }
 }
 
-
 // when server has event see call it or make new client
-void accept_new_client(int *server_fd, int *client_fd, Client_connection *client)
+void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client)
 {
   // accept 
   *client_fd = accept(*server_fd, NULL, NULL);
+  if (*client_fd < 0) return;
+
+  int slot = 0; // check slot value
 
   // find empty slot
   for_each_num(MAX_CLIENT) { // find empty slot for new client
@@ -75,6 +98,8 @@ void accept_new_client(int *server_fd, int *client_fd, Client_connection *client
       client[i].pfd.fd = *client_fd;
       client[i].pfd.events = POLLIN;
 
+      slot = 1;
+
       // what client type connect?
       ClientType client_type;
 
@@ -82,14 +107,18 @@ void accept_new_client(int *server_fd, int *client_fd, Client_connection *client
       client[i].type = client_type;
       break;
     } else {
-      printf("server is full!\n");
     }
+  }
+
+  if (!slot) { // server is full limit client
+    write_sock(*client_fd, 1, "server is full!\n", NULL);
+    close(*client_fd);
   }
 }
 
+// function for reading client action
 static Command cmd;
-
-static void handle_client_events(int i, struct pollfd *fds, Client_connection *client)
+static void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
 {
 
   int n = read(client[i].fd, &cmd, sizeof(cmd));
@@ -129,7 +158,7 @@ static void handle_client_events(int i, struct pollfd *fds, Client_connection *c
   broadcast_status(client);
 }
 
-void client_checker_event(int nfds, struct pollfd *fds, Client_connection *client)
+void client_checker_event(int nfds, struct pollfd *fds, CLIENTS_SYSTEM *client)
 {
   int index = 1; // begin from 1 for clients, server take 0
   for_each_num(MAX_CLIENT) {
@@ -172,13 +201,13 @@ void start_playback(char *path)
 }
 
 // socket mode ( 1 = start ), ( 0 = close )
-void socket_mode(int mode, int *server_fd)
+void server_socket_mode(int mode, int *server_fd)
 {
   unlink(SOCKET_PATH); // remove old socket file
 
   if (mode) {
     // initlize socket protocol
-    struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
+    struct sockaddr_un addr = { AF_UNIX, SOCKET_PATH };
     *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (*server_fd < 0) die("Socket:");
 
