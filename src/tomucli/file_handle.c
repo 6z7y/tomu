@@ -7,8 +7,8 @@
 #include <unistd.h>
 #include <stdarg.h>
 
-#include "share_data.h"
-#include "share_backend.h"
+#include "CLIENT_DATA.h"
+#include "../shared/share_utils.h"
 #include "../shared/shared_control.h"
 
 // Send a file/dir path to server for playback
