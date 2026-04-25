@@ -8,7 +8,7 @@
 #include <sys/un.h>
 
 #include "control.h"
-
+#include "../shared/share_utils.h"
 
 typedef struct {
   Command key;
@@ -49,20 +49,19 @@ void handle_key(Command cmd, Audio_State *state)
 // fn toggle pause/resume
 void playback_toggle(Audio_State *state)
 {
-    pthread_mutex_lock(&state->lock);
-      state->paused = !state->paused;
+  WITH_LOCK(state->lock) {
+    state->paused = !state->paused;
     pthread_cond_broadcast(&state->wait_cond);
-    pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // Stops playback and wakes any waiting threads
 void playback_stop(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
-    // state->paused = 0;
+  WITH_LOCK(state->lock) {
     state->skip_to_next = 0;
     state->running = 0;
     pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // =================================================================
@@ -72,50 +71,50 @@ void playback_stop(Audio_State *state){
 // Requests a seek forward by 5 seconds
 void seek_forward_sec(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     if (!state->seek_request){
       state->seek_request = 1;
       state->seek_target = +5000000; // +5 sec in microsec
       pthread_cond_broadcast(&state->wait_cond);
     }
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 
 // Requests a seek forward by 1 min
 void seek_forward_min(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     if (!state->seek_request){
       state->seek_request = 1;
       state->seek_target = +60000000; // +60 sec in microsec
       pthread_cond_broadcast(&state->wait_cond);
     }
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // Requests a seek backward by 5 seconds
 void seek_backward_sec(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     if (!state->seek_request){
       state->seek_request = 1;
       state->seek_target = -5000000; // -5 sec in microsec
       pthread_cond_broadcast(&state->wait_cond);
     }
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // Requests a seek backward by 1 min
 void seek_backward_min(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     if (!state->seek_request){
       state->seek_request = 1;
       state->seek_target = -60000000; // -60 sec in microsec
       pthread_cond_broadcast(&state->wait_cond);
     }
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // =================================================================
@@ -123,26 +122,26 @@ void seek_backward_min(Audio_State *state)
 // control speed playback
 void playback_speed_defualt(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->speed = 1.00f;
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 
 void playback_speed_increase(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->speed += 0.05f;
     if (state->speed > 2.00f) state->speed = 2.00f;
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 void playback_speed_decrease(Audio_State *state)
 {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->speed -= 0.05f;
     if (state->speed < 0.25f) state->speed = 0.25f;
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // =================================================================
@@ -150,49 +149,49 @@ void playback_speed_decrease(Audio_State *state)
 // control volume playback
 
 inline void volume_increase(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->volume += 0.02f;
     if (state->volume > 1.26f) state->volume = 1.26f;
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 inline void volume_decrease(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->volume -= 0.02f;
     if (state->volume < 0.00f) state->volume = 0.00f;
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 // ===================================================================
 
 // loop toggle
 inline void loop_toggle(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
-    state->looping = !state->looping;
-  pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+  state->looping = !state->looping;
+  // WITH_LOCK(state->lock) {
+  // pthread_cond_broadcast(&state->wait_cond);
+  // }
 }
 
 // shuffle toggle
 void shuffle_toggle(Audio_State *state) {
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->shuffle = !state->shuffle;
   pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 // prev/next playback
 inline void playback_next_audio(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->skip_to_next = 1;
     state->running = 0;
     pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+  }
 }
 
 inline void playback_prev_audio(Audio_State *state){
-  pthread_mutex_lock(&state->lock);
+  WITH_LOCK(state->lock) {
     state->skip_to_next = -1;
     state->running = 0;
     pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+  }
 }
