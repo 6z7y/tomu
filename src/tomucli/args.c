@@ -8,7 +8,7 @@
 #include <stdarg.h>
 
 #include "../shared/SHARE_DATA.h"
-#include "file_handle.h"
+#include "../shared/share_utils.h"
 
 // arg compare opts
 static const char *help_opts[] = {"--help", "-h", NULL};    // help
