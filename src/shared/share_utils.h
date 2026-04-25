@@ -10,6 +10,8 @@
 /* socket */
 #define write_now_normal_msg(fd, msg) (write(fd, msg, strlen(msg))) // send normal msg socket
 #define write_now_struct(fd, structt) write(fd, structt, sizeof(structt)) // send struct socket
+#define write_now_enum(fd, enumm) write(fd, &enumm, sizeof(enumm)) // send struct socket
+
 #define read_now_normal_msg(fd) { char buf[128]; int n = read(fd, buf, sizeof(buf)-1); buf[n] = '\0'; printf("%s", buf); } // read normal msg socket
 
 /* for loop */
