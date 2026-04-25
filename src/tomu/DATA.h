@@ -7,29 +7,24 @@
 #include <libswresample/swresample.h>
 #include <pthread.h>
 #include <poll.h>
+#include <stdatomic.h>
 
 #include "../../libs/miniaudio.h"
 #include "../shared/shared_control.h"
+#include "../shared/SHARE_DATA.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
 // socket data
-typedef enum {
-  CLIENT_CLI,
-  CLIENT_TUI,
-  CLIENT_GUI,
-
-} ClientType;
-
 typedef struct {
   struct pollfd pfd; // for event if pressed key
   ClientType type;   // type client (because tui & gui will have cover img later)
   int fd;            // fd for client
   int active;        // for make listent the client mode
 
-} Client_connection;
+} CLIENTS_SYSTEM;
 // -----------------------------
 
 typedef struct {
@@ -53,7 +48,7 @@ typedef struct {
   int skip_to_next;
   float volume;
   float speed;
-  uint looping;
+  atomic_int looping;
   uint shuffle;
   int seek_request;
   int64_t seek_target;
@@ -101,8 +96,9 @@ typedef struct PlayBackContext{
   Audio_Buffer *buf;
   Audio_State state;
   Audio_Info inf; // information audio
-  pthread_t playback_thread;
+  CLIENTS_SYSTEM client[MAX_CLIENT]; // client handle
   char *queue_list[200];
+  pthread_t playback_thread;
   int queue_count;   // how many paths in queue
   int queue_index;   // which one is currently playing
   int playback_active;
