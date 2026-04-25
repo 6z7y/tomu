@@ -1,36 +1,31 @@
 #include <unistd.h>
-#include <poll.h>
 #include <signal.h>
+#include <poll.h>
 
 #include "DATA.h"
 #include "args.h"
 #include "socket_utils.h"
-#include "utils.h"
 
 PlayBackContext ctx = {0}; // tomu_context
 
 int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean);
-
-  ctx.queue_count = 0;
-
-  if (args_handle(argv[argc - 1])) goto bye;
+  if (args_handle(argv[argc - 1])) goto bye; // argument handle
 
   // 1. init socket
   int *server_fd = &ctx.server_fd;
   int *client_fd = &ctx.client_fd;
-  socket_mode(1, server_fd); // socket on
+  server_socket_mode(1, server_fd); // socket on
 
   // 2. init poll
   struct pollfd fds[1 + MAX_CLIENT]; // (0) = server | (1..MAX_CLIENT) = clients
-  fds[0] = (struct pollfd){ *server_fd, POLLIN };
+  fds[0] = (struct pollfd){ *server_fd, POLLIN }; // setup server
 
   // 3. init client array struct
-  Client_connection client[MAX_CLIENT] = {0};
+  CLIENTS_SYSTEM *client = ctx.client;
 
-  // main loop (server will stay here)
-  while(1) {
+  while(1) { // main loop (server will stay here)
     // 4. add client active inside poll
     int nfds = add_client_into_poll(fds, client); // number clients active now
 
@@ -44,11 +39,9 @@ int main(int argc, char **argv)
 
     if (ctx.state.running) {
       broadcast_status(client); // update status when play audio
+      // usleep(1000 * 100);
     }
   }
-
-  // close socket
-  socket_mode(0, &ctx.server_fd);
 
 bye: return 0;
 }
