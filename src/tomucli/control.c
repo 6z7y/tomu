@@ -4,10 +4,8 @@
 
 #include "control.h"
 #include "utils.h"
-#include "../shared/share_backend.h"
 
-inline void send_cmd(int *server_fd, Command cmd)
-{ write(*server_fd, &cmd, sizeof(Command)); }
+#include "../shared/share_utils.h"
 
 typedef struct {
   char *key; // stdin (keyborard keys)
@@ -15,7 +13,7 @@ typedef struct {
 } KeyMap;
 
 static const KeyMap keymap[] = {
-//    KEY             EXEC
+  /*  KEY               EXEC             */
     { " ",          CMD_PLAY_TOGGLE      },
     { "\n",         CMD_NEXT_AUDIO       },
     { ">",          CMD_NEXT_AUDIO       },
@@ -35,17 +33,34 @@ static const KeyMap keymap[] = {
 
 void handle_control(int *server_fd, const char *key)
 {
-  for (int i = 0; i < sizeof(keymap)/sizeof(keymap[0]); i++) {
+  for_each_arr(keymap) {
     if (!strcmp(key, keymap[i].key)) {
-      send_cmd(server_fd, keymap[i].cmd);
-      // printf("%s\n", key );
+      write_now_enum(*server_fd, keymap[i].cmd);
 
-      }
-
+    }
+    // else printf("'%s'\n", key);
   }
 
   if (!strcmp(key, "q")) {
     printf("hi\n");
     clean_with_bye(server_fd);
   }
+}
+
+// change raw mode terminal 1=on, 0=off
+void termios_mode(int mode)
+{
+  // 1. get terminal settings
+  static struct termios old; 
+
+  // 2. modify with used
+  if (mode == 1){
+    struct termios raw;
+    tcgetattr(STDIN_FILENO, &raw);
+    old = raw;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+  }
+
+  else tcsetattr(STDIN_FILENO, TCSANOW, &old);
 }

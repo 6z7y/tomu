@@ -2,11 +2,9 @@
 #define CONTROL_H
 
 #include "../shared/shared_control.h"
-#include "../shared/share_data.h"
+#include "../shared/SHARE_DATA.h"
 
-inline void send_cmd(int *server_fd, Command cmd);
 void handle_control(int *server_fd, const char *key);
-
-void send_path(int sock, const char *path);
+void termios_mode(int mode);
 
 #endif
