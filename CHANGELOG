@@ -1,5 +1,17 @@
+# 6z7y 1.1.0_beta - 2026-04-25
+
+- update miniaudio lib
+- add some helper utils function 
+- Disabled tomutui & tomugui build target
+
+* tomu:
+  - fix: server full false positive when first slot occupied
+
+* tomucli:
+  - Added support for user config file (~/.config/tomucli/config.conf)
+
 # 6z7y 1.0.7_beta - 2026-04-17
-Major changes:
+Patch changes:
 - change files structure
 - add tomutui & tomugui basic (not ready yet)
 - refactor: reorganize src directory structure
