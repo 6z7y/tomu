@@ -31,7 +31,7 @@ static const KeyMap keymap[] = {
     { CMD_SEEK_FORWARD_1M,  seek_forward_min        },
     { CMD_SEEK_BACKWARD_1M, seek_backward_min       },
     { CMD_LOOP_TOGGLE,      loop_toggle             },
-    { CMD_SHUFFLE_TOGGEL,   shuffle_toggle          },
+    { CMD_SHUFFLE_TOGGLE,   shuffle_toggle          },
 };
 
 // send msg command to all client
