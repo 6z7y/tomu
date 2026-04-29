@@ -11,6 +11,7 @@ PlayBackContext ctx = {0}; // tomu_context
 int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean);
+  signal(SIGPIPE, SIG_IGN); // don't crash on write to closed socket
   if (args_handle(argv[argc - 1])) goto bye; // argument handle
 
   // 1. init socket
