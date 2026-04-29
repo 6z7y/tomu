@@ -1,3 +1,19 @@
+# 6z7y 1.1.1_beta - 2026-04-29
+
+- fix shuffle typo (CMD_SHUFFLE_TOGGEL → CMD_SHUFFLE_TOGGLE)
+- add is_valid_path() utility (check if path exists)
+
+* tomu:
+  - fix issue where playback did not resume correctly after client quit while paused
+
+* tomucli:
+  - add remote command support
+  - simplify main loop and improve runtime argument handling
+  - refactor CLI args handling into command table system
+  - improve CLI help formatting and command listing
+  - improve config system format support (spaces, ' ')
+
+
 # 6z7y 1.1.0_beta - 2026-04-25
 
 - update miniaudio lib
