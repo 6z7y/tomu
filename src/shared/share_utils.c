@@ -2,8 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #include "share_utils.h"
+
+// check from path is exists
+int is_valid_path(const char *path)
+{
+  return (access(path, F_OK) == 0);
+}
 
 char *format(const char *fmt, ...)
 {
