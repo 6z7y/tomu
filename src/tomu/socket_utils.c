@@ -118,17 +118,16 @@ void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client)
 
 // function for reading client action
 static Command cmd;
-static void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
+void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
 {
-
   int n = read(client[i].fd, &cmd, sizeof(cmd));
 
   // if client quit will read this
   if (n <= 0) {
     client_die(i, client);
     printf("test here handle_client_event()\n");
-    if (ctx.state.paused)
-      playback_toggle(&ctx.state);
+    // if (ctx.state.paused)
+    //   playback_toggle(&ctx.state);
     return;  // ← return early, don't fall through
   }
 
