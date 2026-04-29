@@ -17,26 +17,29 @@ static const char *ver_opts[]  = {"--version", "version", "-v", "v", NULL}; // v
 typedef struct {
   const char *option;
   Command cmd;
+  const char *desc;
 } list_cmd;
 
 static const list_cmd cmd_table[] = {
-    {"toggle",  CMD_PLAY_TOGGLE},
-    {"stop",    CMD_STOP},
-    {"next",    CMD_NEXT_AUDIO},
-    {"prev",    CMD_PREV_AUDIO},
-    {"volup",   CMD_VOL_UP},
-    {"voldown", CMD_VOL_DOWN},
-    {"slow",    CMD_SPEED_SLOW},
-    {"fast",    CMD_SPEED_FAST},
-    {"normal",  CMD_SPEED_DEFAULT},
-    {"seek+5",  CMD_SEEK_FORWARD_5S},
-    {"seek+60", CMD_SEEK_FORWARD_1M},
-    {"seek-5",  CMD_SEEK_BACKWARD_5S},
-    {"seek-60", CMD_SEEK_BACKWARD_1M},
-    {"loop",    CMD_LOOP_TOGGLE},
-    {"shuffle", CMD_SHUFFLE_TOGGLE},
-    {NULL, 0}
+/*     option            cmd                        desc              */
+    {"toggle",      CMD_PLAY_TOGGLE,       "Play / pause toggle"},
+    {"stop",        CMD_STOP,              "Stop playback"},
+    {"next",        CMD_NEXT_AUDIO,        "Next audio track"},
+    {"prev",        CMD_PREV_AUDIO,        "Previous audio track"},
+    {"volup",       CMD_VOL_UP,            "Increase volume"},
+    {"voldown",     CMD_VOL_DOWN,          "Decrease volume"},
+    {"slow",        CMD_SPEED_SLOW,        "Slow playback speed"},
+    {"fast",        CMD_SPEED_FAST,        "Fast playback speed"},
+    {"normal",      CMD_SPEED_DEFAULT,     "Reset playback speed"},
+    {"seek+5",      CMD_SEEK_FORWARD_5S,   "Seek forward 5 seconds"},
+    {"seek+60",     CMD_SEEK_FORWARD_1M,   "Seek forward 1 minute"},
+    {"seek-5",      CMD_SEEK_BACKWARD_5S,  "Seek backward 5 seconds"},
+    {"seek-60",     CMD_SEEK_BACKWARD_1M,  "Seek backward 1 minute"},
+    {"loop",        CMD_LOOP_TOGGLE,       "Toggle loop mode"},
+    {"shuffle",     CMD_SHUFFLE_TOGGLE,    "Toggle shuffle mode"},
+    {NULL, 0, NULL}
 };
+
 
 inline int match_opt(const char *arg, const char **opts)
 {
@@ -64,13 +67,13 @@ static inline void help()
     " Options:\n\n"
 
     "   --help,    -h        : show help message\n"
-    "   --version, -v        : show version of program\n"
+    "   --version, -v        : show version of program\n\n"
 
     " Remote commands:\n"
     );
 
   for (int i=0; cmd_table[i].option != NULL; i++) {
-    printf(" %s\n", cmd_table[i].option);
+    printf("    %s:      (%s)\n", cmd_table[i].option, cmd_table[i].desc);
   }
 
   printf(
