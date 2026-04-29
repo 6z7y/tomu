@@ -28,7 +28,7 @@ static const KeyMap keymap[] = {
     { "\x1b[A",     CMD_SEEK_FORWARD_1M  },
     { "\x1b[B",     CMD_SEEK_BACKWARD_1M },
     { "l",          CMD_LOOP_TOGGLE      },
-    { "s",          CMD_SHUFFLE_TOGGEL   },
+    { "s",          CMD_SHUFFLE_TOGGLE   },
 };
 
 void handle_control(int *server_fd, const char *key)
