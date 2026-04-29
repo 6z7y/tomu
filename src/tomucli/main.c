@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -8,7 +7,6 @@
 #include <sys/un.h>
 #include <termios.h>
 #include <signal.h>
-
 
 #include "CLIENT_DATA.h"
 #include "args.h"
@@ -27,8 +25,6 @@ int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean); // when prog close by ctrl+c
 
-  // check args
-  if (args_handle(argv[argc-1])) goto bye; // Argument handle
   printf("\033[?25l"); // hide cursor
 
   int *server_fd = &client_ctx.server_fd; // socket fd session between server
@@ -36,6 +32,7 @@ int main(int argc, char **argv)
 
   // 1. connect to server
   client_socket_mode(server_fd, 1);
+
 
   // 2. send client type
   ClientType my_type = CLIENT_CLI;
@@ -48,6 +45,9 @@ int main(int argc, char **argv)
   termios_mode(1);
 
   // 5. check path
+  if (argc > 1) {
+    if (args_handle(*server_fd, argv[argc-1])) goto bye; // Argument handle
+  }
   if (argc == 2) path_handle(*server_fd, argv[argc-1], queue);
 
   TomuStatus status = {0};
@@ -59,6 +59,7 @@ int main(int argc, char **argv)
   fds[1] = (struct pollfd) { .fd= STDIN_FILENO, .events= POLLIN }; // stdin termios handle
 
   char key[8];
+
 
   // 7. main loop
   while(1) {
@@ -93,30 +94,30 @@ int main(int argc, char **argv)
           int n = read(STDIN_FILENO, key, sizeof(key) - 1);
           if (n > 0) {
               key[n] = '\0';
-              handle_control(&*server_fd, key);
+              handle_control(server_fd, key);
 
-              if (!strcmp(key, "\n") || !strcmp(key, ">")) {
-                  if (queue->has_queue) {
-                      printf("\n");
-                      handle_playback_complete(*server_fd, queue);
-                  }
-              }
-              else if (!strcmp(key, "<")) {
-                  if (queue->has_queue) {
-                      queue->dir.currentFile--;
-                      if (queue->dir.currentFile < 0)
-                          queue->dir.currentFile = queue->dir.totalFiles - 1;
-                      printf("\n");
-                      send_next_from_queue(*server_fd, queue);
-                  }
-              }
+              // if (!strcmp(key, "\n") || !strcmp(key, ">")) {
+              //     if (queue->has_queue) {
+              //         printf("\n");
+              //         handle_playback_complete(*server_fd, queue);
+              //     }
+              // }
+              // else if (!strcmp(key, "<")) {
+              //     if (queue->has_queue) {
+              //         queue->dir.currentFile--;
+              //         if (queue->dir.currentFile < 0)
+              //             queue->dir.currentFile = queue->dir.totalFiles - 1;
+              //         printf("\n");
+              //         send_next_from_queue(*server_fd, queue);
+              //     }
+              // }
           }
       }
   }
 
-  termios_mode(0);
-  client_socket_mode(&*server_fd, 0);
 
 bye:
+  termios_mode(0);
+  client_socket_mode(&*server_fd, 0);
   return 0;
 }
