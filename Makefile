@@ -1,5 +1,6 @@
 CC           := cc
-CFLAGS       := -Wall -g -O3 -Iinclude
+# -O0 (for developer) / -O3 (for final binary)
+CFLAGS       := -Wall -g -O0 -Iinclude
 LIBS         := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil
 INSTALL_PATH := /usr/local/bin
 OBJECT_BUILD_DIR    := build
