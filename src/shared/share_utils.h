@@ -11,14 +11,8 @@
 
 /* socket */
 #define write_now_normal_msg(fd, msg) (write(fd, msg, strlen(msg))) // send normal msg to server
-#define write_now_struct(fd, structt) write(fd, structt, sizeof(structt)) // send struct to server
-
-#define write_now_enum(fd, enumm) \
-do { \
-    Command cmd = (enumm); \
-    write((fd), &cmd, sizeof(cmd)); \
-} while (0) // send enum cmd to server
-
+#define write_now_struct(fd, structt, sizee) write(fd, structt, sizee) // send struct to server
+#define write_now_enum(fd, type, enumm) type cmd = (enumm); write((fd), &cmd, sizeof(cmd));  // send enum cmd to server
 
 #define read_now_normal_msg(fd) { char buf[128]; int n = read(fd, buf, sizeof(buf)-1); buf[n] = '\0'; printf("%s", buf); } // read normal msg socket
 
@@ -32,6 +26,7 @@ do { \
 #define get_min(a) (((int)a % 3600) / 60) // convert time to min
 #define get_sec(a) ((int)a % 60) // convert time to sec
 
+unsigned int get_rand();
 int is_valid_path(const char *path);
 void run_command(char *cmd);
 char *format(const char *fmt, ...);
