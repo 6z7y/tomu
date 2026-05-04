@@ -3,8 +3,27 @@
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "share_utils.h"
+
+// get rand num from linux kernel
+unsigned int get_rand()
+{
+  // 1. init varibles
+  int fd;
+  unsigned int n; // number without negative
+
+  // 2. open file
+  if ((fd = open("/dev/urandom", O_RDONLY)) < 0) die("can't get rand num");
+
+  // 3. read stream
+  if (read(fd, &n, sizeof(n)) != sizeof(n)) die("rand:");
+
+  // 4. close it and return it
+  close(fd);
+  return n;
+}
 
 // check from path is exists
 int is_valid_path(const char *path)
