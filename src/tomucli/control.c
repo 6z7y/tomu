@@ -5,6 +5,7 @@
 #include "control.h"
 #include "utils.h"
 
+#include "CLIENT_DATA.h"
 #include "../shared/share_utils.h"
 
 typedef struct {
@@ -35,16 +36,11 @@ void handle_control(int *server_fd, const char *key)
 {
   for_each_arr(keymap) {
     if (!strcmp(key, keymap[i].key)) {
-      write_now_enum(*server_fd, keymap[i].cmd);
-
+      write_now_enum(*server_fd, Command, keymap[i].cmd);
     }
-    // else printf("'%s'\n", key);
   }
 
-  if (!strcmp(key, "q")) {
-    printf("hi\n");
-    clean_with_bye(server_fd);
-  }
+  if (!strcmp(key, "q")) ctx.running = 0;
 }
 
 // change raw mode terminal 1=on, 0=off
@@ -60,6 +56,7 @@ void termios_mode(int mode)
     old = raw;
     raw.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    printf("\033[?25l"); // hide cursor
   }
 
   else tcsetattr(STDIN_FILENO, TCSANOW, &old);
