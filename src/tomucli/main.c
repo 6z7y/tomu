@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <string.h>
 #include <errno.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -8,6 +7,8 @@
 #include <termios.h>
 #include <signal.h>
 
+#include "../shared/shared_control.h"
+#include "../shared/share_utils.h"
 #include "CLIENT_DATA.h"
 #include "args.h"
 #include "backend.h"
@@ -15,109 +16,108 @@
 #include "control.h"
 #include "file_handle.h"
 #include "utils.h"
-#include "../shared/SHARE_DATA.h"
-#include "../shared/shared_control.h"
 
-// init client ctx
-Client_CTX client_ctx = {0};
+Client_CTX ctx = {0};
 
 int main(int argc, char **argv)
 {
-  signal(SIGINT, sig_clean); // when prog close by ctrl+c
+    signal(SIGINT, sig_clean);
 
-  printf("\033[?25l"); // hide cursor
+    init_context();
+    int *server_fd = &ctx.server_fd;
+    PlaybackQueue *queue = &ctx.queue;
+    TomuStatus *status = &ctx.status;
+    
+    int first_file_sent = 0;
+    int was_playing = 0;  // track previous playback_running state
 
-  int *server_fd = &client_ctx.server_fd; // socket fd session between server
-  PlaybackQueue *queue = &client_ctx.queue; // about path
+    load_config();
+    termios_mode(1);
+    client_socket_mode(server_fd, 1);
 
-  // 1. connect to server
-  client_socket_mode(server_fd, 1);
+    if (argc > 1) {
+      if (args_handle(*server_fd, argc, argv)) goto bye;
+      path_handle(*server_fd, argv[argc-1], queue);
+    }
 
+    struct pollfd fds[2];
+    fds[0] = (struct pollfd){ .fd = STDIN_FILENO, .events = POLLIN };
+    fds[1] = (struct pollfd){ .fd = *server_fd,   .events = POLLIN };
 
-  // 2. send client type
-  ClientType my_type = CLIENT_CLI;
-  write(*server_fd, &my_type, sizeof(ClientType));
+    char key[8];
 
-  // 3. Read config
-  load_config();
+    while (ctx.running) {
+        int ret = poll(fds, 2, 80);
+        if (ret < 0) continue;
 
-  // 4. enter raw terminal
-  termios_mode(1);
+        // Keyboard input
+        if (fds[0].revents & POLLIN) {
+            int n = read(STDIN_FILENO, key, sizeof(key) - 1);
+            if (n > 0) {
+                key[n] = '\0';
+                handle_control(server_fd, key);
+            }
+        }
 
-  // 5. check path
-  if (argc > 1) {
-    if (args_handle(*server_fd, argv[argc-1])) goto bye; // Argument handle
-  }
-  if (argc == 2) path_handle(*server_fd, argv[argc-1], queue);
+        // Server status update
+        if (fds[1].revents & POLLIN) {
+            int n = read(*server_fd, status, sizeof(*status));
+            if (n == sizeof(*status)) {
+                progress(status, status->position, status->duration);
+                
+                // Detect transition: was playing, now not playing
+                if (was_playing && !status->playback_running) {
+                    // Playback just finished -> send next file if in queue mode
+                    if (queue->has_queue && queue->dir.totalFiles > 0) {
+                        // Move to next file (or loop/shuffle)
+                        queue->current_index++;
+                        if (status->shuffle) {
+                            queue->dir.rand_num = get_rand();
+                            queue->current_index = queue->dir.rand_num % queue->dir.totalFiles;
+                        } else if (queue->current_index >= queue->dir.totalFiles) {
+                            if (status->loop)
+                                queue->current_index = 0;
+                            else
+                                continue; // no more files
+                        }
+                        
+                        char fullpath[2048];
+                        snprintf(fullpath, sizeof(fullpath), "%s/%s",
+                                 queue->dir.base_path,
+                                 queue->dir.files[queue->current_index]);
+                        send_path(*server_fd, fullpath);
+                        printf("\nPlaying: %s\n", queue->dir.files[queue->current_index]);
+                    }
+                }
+                was_playing = status->playback_running;
+                
+            } else if (n == 0 || (n < 0 && errno != EAGAIN)) {
+                fprintf(stderr, "Server disconnected\n");
+                break;
+            }
+        }
 
-  TomuStatus status = {0};
-  int playback_finished = 0;
-
-  // 6. init poll
-  struct pollfd fds[2]; // handle 2 fd sync it
-  fds[0] = (struct pollfd){ .fd= *server_fd, .events= POLLIN };    // socket handle
-  fds[1] = (struct pollfd) { .fd= STDIN_FILENO, .events= POLLIN }; // stdin termios handle
-
-  char key[8];
-
-
-  // 7. main loop
-  while(1) {
-      int ret = poll(fds, 2, 100); // (800ms) for ret == 0 
-      if (ret < 0) { continue; }
-
-      if (ret == 0) {  // timeout = silence = song ended
-          if (queue->has_queue && !playback_finished) {
-              playback_finished = 1;
-              handle_playback_complete(*server_fd, queue);
-          }
-          continue;
-      }
-
-      if (fds[0].revents & POLLIN) {
-          int n;
-          while ((n = read(*server_fd, &status, sizeof(TomuStatus)))) {
-              playback_finished = 0;
-
-              struct pollfd pfd = { .fd = *server_fd, .events = POLLIN };
-              if (poll(&pfd, 1, 0) <= 0) break;
-          }
-          if (n == 0 || (n < 0 && errno != EAGAIN)) {
-              fprintf(stderr, "Server disconnected\n");
-              break;
-          }
-
-          progress(&status, status.position, status.duration);
-      }
-
-      if (fds[1].revents & POLLIN) {
-          int n = read(STDIN_FILENO, key, sizeof(key) - 1);
-          if (n > 0) {
-              key[n] = '\0';
-              handle_control(server_fd, key);
-
-              // if (!strcmp(key, "\n") || !strcmp(key, ">")) {
-              //     if (queue->has_queue) {
-              //         printf("\n");
-              //         handle_playback_complete(*server_fd, queue);
-              //     }
-              // }
-              // else if (!strcmp(key, "<")) {
-              //     if (queue->has_queue) {
-              //         queue->dir.currentFile--;
-              //         if (queue->dir.currentFile < 0)
-              //             queue->dir.currentFile = queue->dir.totalFiles - 1;
-              //         printf("\n");
-              //         send_next_from_queue(*server_fd, queue);
-              //     }
-              // }
-          }
-      }
-  }
-
+        // Send first file when server idle and we have a queue
+        if (!status->playback_running && queue->has_queue && !first_file_sent && queue->dir.totalFiles > 0) {
+            char fullpath[2048];
+            if (status->shuffle) {
+                queue->current_index = queue->dir.rand_num % queue->dir.totalFiles;
+            } else {
+                queue->current_index = 0;
+            }
+            snprintf(fullpath, sizeof(fullpath), "%s/%s",
+                     queue->dir.base_path,
+                     queue->dir.files[queue->current_index]);
+            send_path(*server_fd, fullpath);
+            printf("Playing: %s\n", queue->dir.files[queue->current_index]);
+            first_file_sent = 1;
+            was_playing = 0; // ensure transition detection works later
+        }
+    }
 
 bye:
+  queue_free(queue);
   termios_mode(0);
-  client_socket_mode(&*server_fd, 0);
+  client_socket_mode(server_fd, 0);
   return 0;
 }
