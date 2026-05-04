@@ -1,3 +1,17 @@
+# 6z7y 1.1.2_beta - 2026-05-04
+
+- switched optimization from O3 to O0 for better debuggability
+- Implement get_rand() using /dev/urandom for high-quality randomness & remove old random by sec
+- Add playback_running field to TomuStatus struct
+
+* tomu:
+  - Fix accept logic: set client active before fd assignment
+  - Free all queued paths in queue_list on SIGINT
+
+* tomucli:
+  - Rename `client_ctx` → `ctx` for consistency with server
+  - Add 'set' command arg to send file paths to server queue
+
 # 6z7y 1.1.1_beta - 2026-04-29
 
 - fix shuffle typo (CMD_SHUFFLE_TOGGEL → CMD_SHUFFLE_TOGGLE)
