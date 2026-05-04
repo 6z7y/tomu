@@ -1,6 +1,8 @@
 #ifndef CLIENT_DATA_H
 #define CLIENT_DATA_H
 
+#include "../shared/share_utils.h"
+
 // Config Structures
 typedef struct {
   char done;
@@ -15,7 +17,9 @@ typedef struct {
 } CONFIG;
 //----------------------------
 typedef struct {
-  char** files;
+  char **files; // array store name files
+  char base_path[1024]; // for dir and random
+  unsigned int rand_num; // for used for get random (% total files)
   int totalFiles;
   int currentFile;
 } Dir_File;
@@ -23,16 +27,19 @@ typedef struct {
 // Playback queue state
 typedef struct {
   Dir_File dir;
-  char base_path[1024];
   int has_queue;  // Whether we're in directory playback mode
+  int current_index;  // Track current position in queue
+  int file_played;    // Flag to know if we've sent the current file
 } PlaybackQueue;
 
 typedef struct {
   CONFIG cfg;
   PlaybackQueue queue;
+  TomuStatus status;
   int server_fd;
+  int running;
 } Client_CTX;
 
-extern Client_CTX client_ctx;
+extern Client_CTX ctx;
 
 #endif
