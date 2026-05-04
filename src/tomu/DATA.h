@@ -53,6 +53,7 @@ typedef struct {
   int seek_request;
   int64_t seek_target;
   int ready;
+  int playback_finsh;
   pthread_mutex_t lock;
   pthread_cond_t wait_cond;
 
