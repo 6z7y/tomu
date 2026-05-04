@@ -7,7 +7,7 @@
 
 #define SIZE_BUF 64
 
-void save_config(FILE **f, char *home_path, char *cfg_path_parent, char *cfg_path_file)
+void save_config(FILE **f, char *home_path, char *path_parent, char *path_file)
 {
   // make dir first
   printf("Setting default config...\n");
@@ -15,11 +15,13 @@ void save_config(FILE **f, char *home_path, char *cfg_path_parent, char *cfg_pat
   run_command(format("mkdir -p %s/.config/tomucli", home_path));
 
   // write file
-  *f = fopen(cfg_path_file, "w");
+  *f = fopen(path_file, "w");
+  if (!*f) die("config:");
+
   fprintf(*f, "### Progress\ndone: '='\ncurrent: '>'\nremaining: '.'");
 
   fclose(*f);
-  *f = fopen(cfg_path_file, "r");
+  *f = fopen(path_file, "r");
 }
 
 void load_config()
@@ -27,14 +29,17 @@ void load_config()
   // 1. get home path
   char *home_path = getenv("HOME");
 
-  char cfg_path_parent[128];
-    strcpy(cfg_path_parent, format("%s/.config/tomucli", home_path));
-  char cfg_path_file[128];
-    strcpy(cfg_path_file, format("%s/.config/tomucli/config.conf", home_path));
+  char path_parent[128]; // file parent
+    strcpy(path_parent, format("%s/.config/tomucli", home_path));
+
+  char path_file[128]; // file path
+    strcpy(path_file, format("%s/.config/tomucli/config.conf", home_path));
 
   // 2. Read file
-  FILE *f;
-  if (!(f = fopen(cfg_path_file, "r"))) save_config(&f, home_path, cfg_path_parent, cfg_path_file);
+  FILE *f = fopen(path_file, "r");
+  if (!f) {
+    save_config(&f, home_path, path_parent, path_file);
+  };
 
   // 3. init buffers
   char line[SIZE_BUF], key[SIZE_BUF], value[SIZE_BUF];
@@ -52,17 +57,17 @@ void load_config()
 
       if (!strcmp(key, "done")) {
         // printf("1key: (%s), with value: (%s)\n", key, value);
-        client_ctx.cfg.progress.done = value[0];
+        ctx.cfg.progress.done = value[0];
       }
 
       if (!strcmp(key, "current")) {
         // printf("2key: (%s), with value: (%s)\n", key, value);
-        client_ctx.cfg.progress.current = value[0];
+        ctx.cfg.progress.current = value[0];
       }
 
       if (!strcmp(key, "remaining")) {
         // printf("3key: (%s), with value: (%s)\n", key, value);
-        client_ctx.cfg.progress.remaining = value[0];
+        ctx.cfg.progress.remaining = value[0];
       }
     }
   }
