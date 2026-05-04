@@ -25,7 +25,7 @@ inline enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
 }
 
 // function take from interleaved_value get mini audio format
-inline ma_format get_ma_format(enum AVSampleFormat value)
+ma_format get_ma_format(enum AVSampleFormat value)
 {
   switch (value){
     case AV_SAMPLE_FMT_DBL: return ma_format_f32;
@@ -60,7 +60,7 @@ static inline void store_information(int audioStream_index, enum AVSampleFormat 
 }
 
 // function for search audio stream
-inline int get_audioStream()
+int get_audioStream()
 {
   for_each_num(ctx.fmtCTX->nb_streams) { // loop by number streams
     AVStream *stream = ctx.fmtCTX->streams[i]; // select index stream between 0..nb_stream
@@ -189,8 +189,8 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   state->paused = 0;
   state->volume = 1.00f;
   state->speed = 1.00f;
-  state->looping = 0;
-  state->shuffle = 1;
+  state->looping = loop;
+  state->shuffle = shuffle;
 
   state->seek_request = 0;
   state->seek_target = 0;
@@ -256,7 +256,6 @@ void get_metadata()
     else if (!strcmp(tag->key, "track")) metadata->track = strdup(tag->value);
   }
 }
-
 
 ///////////////////////////////////////////////////// about extract cover img
 int make_dir(const char *path) {

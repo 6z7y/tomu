@@ -13,6 +13,9 @@
 
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value);
 
+ma_format get_ma_format(enum AVSampleFormat value);
+
+int get_audioStream();
 int get_audio_info(const char *filename);
 int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX);
 void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX);
