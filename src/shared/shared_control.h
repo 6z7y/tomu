@@ -29,6 +29,7 @@ typedef struct {
   float speed;
   int   shuffle;
   int   loop;
+  int   playback_running;
 
 } TomuStatus;
 
