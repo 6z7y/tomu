@@ -18,9 +18,9 @@ void progress(TomuStatus *status, double current_time, int duration_time)
 {
   if (duration_time == 0) return;
 
-  char done = client_ctx.cfg.progress.done;
-  char current = client_ctx.cfg.progress.current;
-  char remaining = client_ctx.cfg.progress.remaining;
+  const char done = ctx.cfg.progress.done;
+  const char current = ctx.cfg.progress.current;
+  const char remaining = ctx.cfg.progress.remaining;
 
   int bar_width = 32;
   int pos = (int)((current_time / duration_time) * bar_width);
