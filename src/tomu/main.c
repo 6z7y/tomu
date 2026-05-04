@@ -12,6 +12,7 @@ int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean);
   signal(SIGPIPE, SIG_IGN); // don't crash on write to closed socket
+
   if (args_handle(argv[argc - 1])) goto bye; // argument handle
 
   // 1. init socket
@@ -33,14 +34,22 @@ int main(int argc, char **argv)
     // 5. start poll mode
     poll(fds, nfds, 100);
 
-    // Accept new Client
+    // fd[0] Accept new Client
     if (fds[0].revents & POLLIN) accept_new_client(server_fd, client_fd, client);
 
-    client_checker_event(nfds, fds, client); // check event control
+    // fd[1] read keys
+    int index = 1; // begin from 1 for clients, server take 0
+    for_each_num(MAX_CLIENT) {
+      if (!client[i].active) continue;
+
+      if (fds[index].revents & POLLIN && index < nfds) 
+          handle_client_events(i, fds, client);
+
+      index++;
+    }
 
     if (ctx.state.running) {
       broadcast_status(client); // update status when play audio
-      // usleep(1000 * 100);
     }
   }
 
