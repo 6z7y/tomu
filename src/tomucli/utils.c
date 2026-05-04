@@ -9,17 +9,12 @@
 #include "utils.h"
 #include "../shared/SHARE_DATA.h"
 #include "../shared/share_utils.h"
+#include "file_handle.h"
 
 void sig_clean(int sig)
 {
-  client_socket_mode(&client_ctx.server_fd, 0);
-  termios_mode(0);
-  _exit(0);
-}
-
-void clean_with_bye(int *server_fd)
-{
-  client_socket_mode(server_fd, 0);
+  queue_free(&ctx.queue);
+  client_socket_mode(&ctx.server_fd, 0);
   termios_mode(0);
   _exit(0);
 }
@@ -37,7 +32,18 @@ void client_socket_mode(int *server_fd, int mode)
     // 2. Connect socket
     if (connect(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
       die("Connect failed, make sure server running");
+    
+    // 3. send type
+    write_now_enum(*server_fd, ClientType, CLIENT_CLI);
   }
 
   else close(*server_fd); // mode 0 (close)
+}
+
+void init_context()
+{
+  ctx.running = 1;
+  // ctx.queue.current_index = 0;     // Start at first file
+  // ctx.queue.file_played = 0;       // No file played yet
+  ctx.queue.dir.rand_num = get_rand();
 }
