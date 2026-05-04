@@ -7,9 +7,8 @@
 int add_client_into_poll(struct pollfd *fds, CLIENTS_SYSTEM *client);
 void broadcast_status(CLIENTS_SYSTEM *client);
 void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client);
-void client_checker_event(int nfds, struct pollfd *fds, CLIENTS_SYSTEM *client);
 void start_playback(char *path);
-void send_cmd(int sock, Command cmd);
+void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client);
 void *playback_thread_func(void *arg);
 void server_socket_mode(int mode, int *server_fd);
 

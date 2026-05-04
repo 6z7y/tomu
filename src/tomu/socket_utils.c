@@ -10,14 +10,6 @@
 #include "control.h"
 #include "../shared/share_utils.h"
 
-// function used for write to socket
-// about arg mode (1=msg, 2=Struct_Status)
-static inline void write_sock(int fd, int mode, char *msgg, TomuStatus *status)
-{
-  if      (mode == 1) write(fd, msgg, strlen(msgg));
-  else if (mode == 2) write(fd, status, sizeof(TomuStatus));
-}
-
 // function used for reading from socket
 static inline void read_sock(int client_fd)
 {
@@ -71,11 +63,12 @@ void broadcast_status(CLIENTS_SYSTEM *client)
     .speed     = ctx.state.speed,
     .shuffle   = ctx.state.shuffle,
     .loop      = ctx.state.looping,
+    .playback_running = ctx.state.running,
   };
 
   for_each_num(MAX_CLIENT) {
     if (client[i].active) {
-      write_sock(client[i].fd, 2, NULL, &status);
+      write_now_struct(client[i].fd, &status, sizeof(status));
     }
   }
 }
@@ -83,9 +76,8 @@ void broadcast_status(CLIENTS_SYSTEM *client)
 // when server has event see call it or make new client
 void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client)
 {
-  // accept 
-  *client_fd = accept(*server_fd, NULL, NULL);
-  if (*client_fd < 0) return;
+  // accept new client or quit if not there
+  if ((*client_fd = accept(*server_fd, NULL, NULL)) < 0) return;
 
   int slot = 0; // check slot value
 
@@ -93,8 +85,8 @@ void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client)
   for_each_num(MAX_CLIENT) { // find empty slot for new client
     if (!client[i].active) { // if not active to limit
       printf("new client %d type: %d\n", i + 1, client[i].type);
-      client[i].fd = *client_fd;
       client[i].active = 1;
+      client[i].fd = *client_fd;
       client[i].pfd.fd = *client_fd;
       client[i].pfd.events = POLLIN;
 
@@ -106,12 +98,11 @@ void accept_new_client(int *server_fd, int *client_fd, CLIENTS_SYSTEM *client)
       read(*client_fd, &client_type, sizeof(ClientType));
       client[i].type = client_type;
       break;
-    } else {
-    }
+    } 
   }
 
   if (!slot) { // server is full limit client
-    write_sock(*client_fd, 1, "server is full!\n", NULL);
+    write_now_normal_msg(*client_fd, "server is full!\n");
     close(*client_fd);
   }
 }
@@ -126,76 +117,72 @@ void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
   if (n <= 0) {
     client_die(i, client);
     printf("test here handle_client_event()\n");
-    // if (ctx.state.paused)
-    //   playback_toggle(&ctx.state);
     return;  // ← return early, don't fall through
   }
 
   if (cmd == CMD_PATH) {
-      int pathlen = 0;
-      read(client[i].fd, &pathlen, sizeof(int));
-      if (pathlen > 0 && pathlen < 2048) {
-          char *path = malloc(pathlen + 1);
-          read(client[i].fd, path, pathlen);
-          path[pathlen] = '\0';
+    size_t pathlen = 0;
+    read(client[i].fd, &pathlen, sizeof(int));
+    if (pathlen > 0 && pathlen < 2048) {
+      char *path = malloc(pathlen + 1);
+      read(client[i].fd, path, pathlen);
+      path[pathlen] = '\0';
 
-          if (ctx.queue_count < 200) {
-              ctx.queue_list[ctx.queue_count] = strdup(path);
-              printf("add %s in list %d\n", ctx.queue_list[ctx.queue_count], ctx.queue_count);
-              ctx.queue_count++;
-          }
-          free(path);
-
-          // only start if nothing is playing
-          if (!ctx.playback_active) start_playback(ctx.queue_list[ctx.queue_index]);
+      if (ctx.queue_count < 200) {
+          ctx.queue_list[ctx.queue_count] = strdup(path);
+          printf("add %s in list %d\n", ctx.queue_list[ctx.queue_count], ctx.queue_count);
+          ctx.queue_count++;
       }
+      free(path);
+
+      // only start if nothing is playing
+      if (!ctx.playback_active) start_playback(ctx.queue_list[ctx.queue_index]);
+    }
   }
-  else {
-    handle_key(cmd, &ctx.state);
-  }
+
+  else handle_key(cmd, &ctx.state);
 
   broadcast_status(client);
-}
-
-void client_checker_event(int nfds, struct pollfd *fds, CLIENTS_SYSTEM *client)
-{
-  int index = 1; // begin from 1 for clients, server take 0
-  for_each_num(MAX_CLIENT) {
-    if (!client[i].active) continue;
-
-    if (index < nfds && fds[index].revents & POLLIN) {
-      handle_client_events(i, fds, client);
-    }
-    index++;
-
-  }
 }
 
 void *start_playback_thread(void *arg) {
     char *path = (char*)arg;
     playback_run(path, 0, 1);
-    free(path);
+    free(path); // safe — this is always a strdup copy, not queue_list[i] directly
+
     ctx.playback_active = 0;
 
-    ctx.queue_index++;
-    if (ctx.queue_index < ctx.queue_count) {
-        char *next = strdup(ctx.queue_list[ctx.queue_index]);
-        pthread_create(&ctx.playback_thread, NULL, start_playback_thread, next);
-        ctx.playback_active = 1;
+    // respect skip_to_next direction (next/prev key)
+    int skip = ctx.state.skip_to_next;
+    ctx.state.skip_to_next = 0;
+
+    if (skip == -1) {
+        if (ctx.queue_index > 0) ctx.queue_index--;
+    } else {
+        ctx.queue_index++;
     }
 
+    if (ctx.queue_index < ctx.queue_count) {
+        char *next = strdup(ctx.queue_list[ctx.queue_index]);
+        pthread_t t;
+        pthread_create(&t, NULL, start_playback_thread, next);
+        pthread_detach(t);
+        ctx.playback_thread = t;
+        ctx.playback_active = 1;
+    }
+    // else: queue exhausted, stay idle
     return NULL;
 }
 
-void start_playback(char *path)
-{
-    if (ctx.playback_active) {
-        playback_stop(&ctx.state);
-        pthread_detach(ctx.playback_thread);
-        ctx.playback_active = 0;
-    }
-
-    pthread_create(&ctx.playback_thread, NULL, start_playback_thread, path);
+void start_playback(char *path) {
+    // if (ctx.playback_active) {
+    //     playback_stop(&ctx.state);
+    //     pthread_detach(ctx.playback_thread); // wait cleanly, don't detach
+    //     ctx.playback_active = 0;
+    // }
+    char *copy = strdup(path); // thread owns this copy, safe to free
+    pthread_create(&ctx.playback_thread, NULL, start_playback_thread, copy);
+    pthread_detach(ctx.playback_thread); // wait cleanly, don't detach
     ctx.playback_active = 1;
 }
 
