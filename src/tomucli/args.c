@@ -9,6 +9,8 @@
 
 #include "../shared/SHARE_DATA.h"
 #include "../shared/share_utils.h"
+#include "CLIENT_DATA.h"
+#include "file_handle.h"
 
 // arg compare opts
 static const char *help_opts[] = {"--help", "help", "-h", "h", NULL};    // help
@@ -21,7 +23,8 @@ typedef struct {
 } list_cmd;
 
 static const list_cmd cmd_table[] = {
-/*     option            cmd                        desc              */
+/*     option           cmd                       desc               */
+    {"set",         CMD_PATH,              "Send File path to queue"},
     {"toggle",      CMD_PLAY_TOGGLE,       "Play / pause toggle"},
     {"stop",        CMD_STOP,              "Stop playback"},
     {"next",        CMD_NEXT_AUDIO,        "Next audio track"},
@@ -41,7 +44,7 @@ static const list_cmd cmd_table[] = {
 };
 
 
-inline int match_opt(const char *arg, const char **opts)
+int match_opt(const char *arg, const char **opts)
 {
   for (int i=0; opts[i]; i++)
       if (!strcmp(arg, opts[i])) return 1;
@@ -49,12 +52,17 @@ inline int match_opt(const char *arg, const char **opts)
   return 0;
 }
 
-int handle_remote(int fd, const char *option)
+int handle_remote(int fd, const char *option, const char *path)
 {
   for (int i=0; cmd_table[i].option != NULL; i++) {
+
     if (!strcmp(cmd_table[i].option, option)) {
-      write_now_enum(fd, cmd_table[i].cmd);
-      return 0;
+        if (i == 0) send_path(ctx.server_fd, path);
+
+        else {
+          write_now_enum(fd, Command, cmd_table[i].cmd);
+        }
+        return 0;
     }
   }
   return 1;
@@ -95,17 +103,20 @@ static inline void help()
   );
 }
 
-int args_handle(int fd, const char *option)
+int args_handle(int fd, int argc, char **argv)
 {
-  if (is_valid_path(option)) return 0; // check path exitsts
+  char *option = argv[1];
+  char *path = argv[argc - 1]; // for arg ( set [FILE] )
 
-  if (!handle_remote(fd, option)) goto last; // remote command
+    if      (is_valid_path(option)) return 0; // check path exitsts
 
-  else if (match_opt(option, help_opts)) help();
+    else if (!handle_remote(fd, option, path)) goto last; // remote command
 
-  else if (match_opt(option, ver_opts)) printf("tomucli: %s\n", TOMUCLI_VER);
+    else if (match_opt(option, help_opts)) help();
 
-  else    warn("[T]: unknown option '%s'\n\ntry '%s --help'", option, TOMUCLI_NAME);
+    else if (match_opt(option, ver_opts)) printf("tomucli: %s\n", TOMUCLI_VER);
+
+    else    die("[T]: unknown option/Path '%s'\n\ntry '%s --help'", option, TOMUCLI_NAME);
 
 last:
   return 1;
