@@ -7,32 +7,19 @@
 #include <stdarg.h>
 
 #include "CLIENT_DATA.h"
+#include "control.h"
 #include "../shared/share_utils.h"
 #include "../shared/shared_control.h"
 
-// Send a file/dir path to server for playback
-void send_path(int server_fd, const char *path)
-{
-    Command cmd = CMD_PATH;
-    int pathlen = strlen(path);
-
-    // send: CMD_PATH | length | path
-    write(server_fd, &cmd,     sizeof(Command));
-    write(server_fd, &pathlen, sizeof(int));
-    write(server_fd, path,     pathlen);
-}
 
 void queue_free(PlaybackQueue *queue)
 {
   if (!queue->dir.files) return;
 
-  if (queue->has_queue) {
-    for_each_num(queue->dir.totalFiles) {
-      free(queue->dir.files[i]);
-    }
+  for_each_num(queue->dir.totalFiles) {
+    free(queue->dir.files[i]);
   }
 
-  else free(queue->dir.files[0]);
   
   free(queue->dir.files);
   queue->dir.files = NULL;
@@ -85,14 +72,14 @@ void path_handle(int server_fd, const char *path, PlaybackQueue *queue)
         strncpy(queue->dir.base_path, path, sizeof(queue->dir.base_path) - 1);
         extractDir(path, &queue->dir);
         queue->has_queue = 1;  // IMPORTANT: Set this flag
-        queue->current_index = 0;
+        queue->current_index = queue->dir.rand_num % queue->dir.totalFiles;
 
     } else if (S_ISREG(st.st_mode)) {
-      queue->dir.files = malloc(sizeof(char *));
-      queue->dir.files[0] = strdup(path);
-      queue->dir.totalFiles++;
-      queue->has_queue = 1;  // Single file mode
-      printf("Playing: %s\n", path);
+      send_path(ctx.server_fd, path);
+      // queue->dir.files = malloc(sizeof(char *));
+      // queue->dir.files[0] = strdup(path);
+      // queue->dir.totalFiles = 1;
+      // queue->has_queue = 1;  // Single file mode
 
     } else die("File:");
 }
