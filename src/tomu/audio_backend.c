@@ -43,7 +43,7 @@ void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_wr
 }
 
 // READ AUDIO DATA FROM BUFFER TO SPEAKER
-static void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
+void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 {
   pthread_mutex_lock(&buf->lock);
   
@@ -82,6 +82,7 @@ static void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_need
 }
 
 // miniaudio will use this callback to read PCM samples
+// this for send raw pcm audio file to speaker (send @!)
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
 {
   Audio_Info *inf = &ctx.inf;
@@ -96,9 +97,6 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
     // progress(state, current_time, duration_sec);
     pthread_mutex_unlock(&state->lock);
 
-  pthread_mutex_lock(&ctx.buf->lock);
-  ctx.buf->stopped = 1;
-  pthread_mutex_unlock(&ctx.buf->lock);
   
   int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
   audio_buffer_read(ctx.buf, output, bytes);
@@ -111,6 +109,7 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
 }
 
 // init miniaudio config before using
+// this for init (the a sender for )
 ma_device_config init_miniaudioConfig(Audio_Info *inf)
 {
   ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
