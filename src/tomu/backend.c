@@ -212,15 +212,14 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   av_log_set_level(AV_LOG_QUIET); // ignore warning
 
   // 1. Read file audio
-  if (get_audio_info(filename) < 0) return -1;
+  if (get_audio_info(filename) < 0) goto clean_every;
 
   get_metadata(); // get metadata
   extract_cover(filename); // extract cover img 
 
   // initialize a buffer, size = 500ms (Streaming mode)
-  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.8;
+  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.3;
   ctx.buf = audio_buffer_init(capacity);
-
 
   // 3. init miniaudio device
   ma_device device;
@@ -233,7 +232,6 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
   init_playbackstatus(&ctx.state, loop_mode, shuffle_mode);
 
   // 6. NOW mark as ready! (after all initialization)
-  ctx.state.ready = 1;
 
   // 7. start threads
   pthread_t decoder_thread;
@@ -252,7 +250,6 @@ clean_every:
   pthread_mutex_destroy(&ctx.state.lock);
   pthread_cond_destroy(&ctx.state.wait_cond);
   cleanUP();
-  // printf("hi\n");
   // Zero out per-song state so next song starts clean
   // memset(&ctx.inf, 0, sizeof(ctx.inf));
   return 0;
