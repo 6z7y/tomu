@@ -11,23 +11,23 @@
 #include "../shared/share_utils.h"
 
 // function used for reading from socket
-static inline void read_sock(int client_fd)
-{
-  char msg[256];
-  int r = read(client_fd, msg, sizeof(msg) - 1);
-
-  if (r > 0) {
-    msg[r] = 0;
-    printf("%s", msg);
-    fflush(stdout);
-  }
-  else if (r == 0) {printf("client dissconnect\n"); close(client_fd);}
-  else {perror("read");}
-}
+// static inline void read_sock(int client_fd)
+// {
+//   char msg[256];
+//   int r = read(client_fd, msg, sizeof(msg) - 1);
+//
+//   if (r > 0) {
+//     msg[r] = 0;
+//     printf("%s", msg);
+//     fflush(stdout);
+//   }
+//   else if (r == 0) {printf("client dissconnect\n"); close(client_fd);}
+//   else {perror("read");}
+// }
 
 
 // function for kill client
-static inline void client_die(int i, CLIENTS_SYSTEM *client)
+void client_die(int i, CLIENTS_SYSTEM *client)
 {
   close(client[i].fd);
   client[i].fd = -1;
@@ -50,21 +50,19 @@ int add_client_into_poll(struct pollfd *fds, CLIENTS_SYSTEM *client)
 }
 
 // function for send status for clients
-static TomuStatus status;
+TomuStatus status;
 void broadcast_status(CLIENTS_SYSTEM *client)
 {
-  if (!ctx.playback_active || !ctx.state.ready) return;
+  if (!ctx.playback_active) return;
 
-  TomuStatus status = {
-    .duration  = ctx.state.duration,
-    .position  = ctx.state.position,
-    .paused    = ctx.state.paused,
-    .volume    = ctx.state.volume,
-    .speed     = ctx.state.speed,
-    .shuffle   = ctx.state.shuffle,
-    .loop      = ctx.state.looping,
-    .playback_running = ctx.state.running,
-  };
+  status.duration  = ctx.state.duration;
+  status.position  = ctx.state.position;
+  status.paused    = ctx.state.paused;
+  status.volume    = ctx.state.volume;
+  status.speed     = ctx.state.speed;
+  status.shuffle   = ctx.state.shuffle;
+  status.loop      = ctx.state.looping;
+  status.playback_running = ctx.state.running;
 
   for_each_num(MAX_CLIENT) {
     if (client[i].active) {
@@ -187,11 +185,11 @@ void start_playback(char *path) {
 }
 
 // socket mode ( 1 = start ), ( 0 = close )
-void server_socket_mode(int mode, int *server_fd)
+void server_socket_mode(int *server_fd, int ON)
 {
   unlink(SOCKET_PATH); // remove old socket file
 
-  if (mode) {
+  if (ON) {
     // initlize socket protocol
     struct sockaddr_un addr = { AF_UNIX, SOCKET_PATH };
     *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
