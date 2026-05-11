@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "shared_control.h"
 
@@ -25,6 +26,9 @@
 #define get_hour(a) ((int)a / 3600) // convert time to hour
 #define get_min(a) (((int)a % 3600) / 60) // convert time to min
 #define get_sec(a) ((int)a % 60) // convert time to sec
+
+// sleeping
+#define sleep_ms(n) usleep(1000*n)
 
 unsigned int get_rand();
 int is_valid_path(const char *path);
