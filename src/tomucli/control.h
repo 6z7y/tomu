@@ -4,7 +4,8 @@
 #include "../shared/shared_control.h"
 #include "../shared/SHARE_DATA.h"
 
-void handle_control(int *server_fd, const char *key);
-void termios_mode(int mode);
+void send_path(int server_fd, const char *path);
+void handle_control(int *server_fd, const char *key,int n);
+void termios_mode(int ON);
 
 #endif

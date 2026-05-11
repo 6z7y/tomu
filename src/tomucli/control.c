@@ -1,9 +1,9 @@
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
 
 #include "control.h"
-#include "utils.h"
 
 #include "CLIENT_DATA.h"
 #include "../shared/share_utils.h"
@@ -32,7 +32,19 @@ static const KeyMap keymap[] = {
     { "s",          CMD_SHUFFLE_TOGGLE   },
 };
 
-void handle_control(int *server_fd, const char *key)
+// Send a file/dir path to server for playback
+void send_path(int server_fd, const char *path)
+{
+    Command cmd = CMD_PATH;
+    int pathlen = strlen(path);
+
+    // send: CMD_PATH | length | path
+    if (write(server_fd, &cmd,     sizeof(Command)) != sizeof(Command)) die("[T] can't send command");
+    if (write(server_fd, &pathlen, sizeof(int)) != sizeof(int)) die("[T] can't send path len");
+    if (write(server_fd, path,     pathlen) != pathlen) die("[T] can't send path data");
+}
+
+void handle_control(int *server_fd, const char *key, int n)
 {
   for_each_arr(keymap) {
     if (!strcmp(key, keymap[i].key)) {
@@ -43,17 +55,16 @@ void handle_control(int *server_fd, const char *key)
   if (!strcmp(key, "q")) ctx.running = 0;
 }
 
+struct termios old; 
+
 // change raw mode terminal 1=on, 0=off
-void termios_mode(int mode)
+void termios_mode(int ON)
 {
-  // 1. get terminal settings
-  static struct termios old; 
 
   // 2. modify with used
-  if (mode == 1){
-    struct termios raw;
-    tcgetattr(STDIN_FILENO, &raw);
-    old = raw;
+  if (ON){
+    tcgetattr(STDIN_FILENO, &old); // 
+    struct termios raw = old;
     raw.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
     printf("\033[?25l"); // hide cursor
