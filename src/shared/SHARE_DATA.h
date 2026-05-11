@@ -6,11 +6,11 @@
 
 // server info
 #define TOMU_NAME "tomu"
-#define TOMU_VER "1.1.2"
+#define TOMU_VER "1.2.0"
 
 // client info
 #define TOMUCLI_NAME "tomucli"
-#define TOMUCLI_VER "1.1.1"
+#define TOMUCLI_VER "1.2.0"
 
 #define TOMUTUI_NAME "tomutui"
 #define TOMUTUI_VER "X.X.X"
