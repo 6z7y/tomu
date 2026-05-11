@@ -4,6 +4,7 @@
 
 #include "DATA.h"
 #include "args.h"
+#include "discord_integration.h"
 #include "socket_utils.h"
 
 PlayBackContext ctx = {0}; // tomu_context
@@ -13,12 +14,13 @@ int main(int argc, char **argv)
   signal(SIGINT, sig_clean);
   signal(SIGPIPE, SIG_IGN); // don't crash on write to closed socket
 
-  if (args_handle(argv[argc - 1])) goto bye; // argument handle
+  discord_init();  // ADD THIS - connects to Discord
 
+  if (args_handle(argv[argc - 1])) goto bye; // argument handle
   // 1. init socket
   int *server_fd = &ctx.server_fd;
   int *client_fd = &ctx.client_fd;
-  server_socket_mode(1, server_fd); // socket on
+  server_socket_mode(server_fd, 1); // socket on
 
   // 2. init poll
   struct pollfd fds[1 + MAX_CLIENT]; // (0) = server | (1..MAX_CLIENT) = clients
@@ -34,6 +36,11 @@ int main(int argc, char **argv)
     // 5. start poll mode
     poll(fds, nfds, 100);
 
+    if (ctx.state.running) {
+      broadcast_status(client); // update status when play audio
+      discord_update_presence();  // ADD THIS - updates Discord when song changes
+    }
+
     // fd[0] Accept new Client
     if (fds[0].revents & POLLIN) accept_new_client(server_fd, client_fd, client);
 
@@ -48,10 +55,9 @@ int main(int argc, char **argv)
       index++;
     }
 
-    if (ctx.state.running) {
-      broadcast_status(client); // update status when play audio
-    }
   }
 
-bye: return 0;
+bye: 
+  discord_cleanup();  // ADD THIS - cleanup on exit
+  return 0;
 }

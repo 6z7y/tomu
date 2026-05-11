@@ -20,10 +20,10 @@ void sig_clean(int sig)
 }
 
 // mode ( 1 = start ), ( 0 = close )
-void client_socket_mode(int *server_fd, int mode)
+void client_socket_mode(int *server_fd, int ON)
 {
   // mode 1 (start)
-  if (mode) {
+  if (ON) {
     // 1. create socket
     struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
     *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
