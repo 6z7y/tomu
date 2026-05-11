@@ -18,7 +18,7 @@ void save_config(FILE **f, char *home_path, char *path_parent, char *path_file)
   *f = fopen(path_file, "w");
   if (!*f) die("config:");
 
-  fprintf(*f, "### Progress\ndone: '='\ncurrent: '>'\nremaining: '.'");
+  fprintf(*f, "### Progress\nwidth: '32'\ndone: '='\ncurrent: '>'\nremaining: '.'");
 
   fclose(*f);
   *f = fopen(path_file, "r");
@@ -54,6 +54,11 @@ void load_config()
 
     // 7. read line and split
     if (sscanf(line, "%[^:]: '%[^']'", key, value) == 2) {
+
+      if (!strcmp(key, "width")) {
+        printf("1key: (%s), with value: (%s)\n", key, value);
+        ctx.cfg.progress.width = atoi(value);
+      }
 
       if (!strcmp(key, "done")) {
         // printf("1key: (%s), with value: (%s)\n", key, value);

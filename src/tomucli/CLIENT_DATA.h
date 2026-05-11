@@ -5,6 +5,7 @@
 
 // Config Structures
 typedef struct {
+  int width;
   char done;
   char current;
   char remaining;
