@@ -4,8 +4,7 @@
 #include <stdio.h>
 
 void sig_clean(int sig);
-void clean_with_bye(int *server_fd);
-void client_socket_mode(int *server_fd, int mode);
+void client_socket_mode(int *server_fd, int ON);
 void init_context();
 
 #endif
