@@ -39,7 +39,7 @@ ma_format get_ma_format(enum AVSampleFormat value)
 }
 
 // store information Audio file to Audio_Info structure
-static inline void store_information(int audioStream_index, enum AVSampleFormat sample_fmt )
+void store_information(int audioStream_index, enum AVSampleFormat sample_fmt )
 {
   Audio_Info *inf = &ctx.inf;
 
@@ -97,8 +97,8 @@ int get_audio_info(const char *filename)
     return warn("ffmpeg: can't find any streams");
   } // checking any streams in audio Structure
 
-  int audioStream_index = get_audioStream();
-  if (audioStream_index < 0) {
+  int audioStream_index;
+  if ((audioStream_index = get_audioStream()) < 0) {
     return warn("can't find audioStream");
   } // Search audio Stream
 
@@ -195,7 +195,6 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
   state->seek_request = 0;
   state->seek_target = 0;
 
-  state->ready = 0;  // ← Not ready until file is loaded
 
   pthread_mutex_init(&state->lock, NULL);
   pthread_cond_init(&state->wait_cond, NULL);
@@ -240,24 +239,45 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
 
 void get_metadata()
 {
-  Audio_Metadata *metadata = &ctx.state.metadata;
+  // free PREVIOUS song metadata first
+  Audio_Metadata *m = &ctx.state.metadata;
+  free(m->title); free(m->artist); free(m->album);
+  free(m->album_artist); free(m->genre);
+  free(m->date);  free(m->track);
+  memset(m, 0, sizeof(*m));
+
+  // now load new metadata
   AVDictionaryEntry *tag = NULL;
-
-  printf("File tags:\n");
   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    printf("  %s : %s\n", tag->key, tag->value);
-
-    if      (!strcmp(tag->key, "title")) metadata->title = strdup(tag->value);
-    else if (!strcmp(tag->key, "artist")) metadata->artist = strdup(tag->value);
-    else if (!strcmp(tag->key, "album")) metadata->album = strdup(tag->value);
-    else if (!strcmp(tag->key, "album_artist")) metadata->album_artist = strdup(tag->value);
-    else if (!strcmp(tag->key, "genre")) metadata->genre = strdup(tag->value);
-    else if (!strcmp(tag->key, "date")) metadata->date = strdup(tag->value);
-    else if (!strcmp(tag->key, "track")) metadata->track = strdup(tag->value);
+    if      (!strcmp(tag->key, "title"))        m->title        = strdup(tag->value);
+    else if (!strcmp(tag->key, "artist"))       m->artist       = strdup(tag->value);
+    else if (!strcmp(tag->key, "album"))        m->album        = strdup(tag->value);
+    else if (!strcmp(tag->key, "album_artist")) m->album_artist = strdup(tag->value);
+    else if (!strcmp(tag->key, "genre"))        m->genre        = strdup(tag->value);
+    else if (!strcmp(tag->key, "date"))         m->date         = strdup(tag->value);
+    else if (!strcmp(tag->key, "track"))        m->track        = strdup(tag->value);
   }
 }
 
 ///////////////////////////////////////////////////// about extract cover img
+// Helper: extract filename without path and build full output path
+void build_output_path(const char *input, char *out, size_t size) {
+    // Get just the filename from the full path
+    const char *base = strrchr(input, '/');
+    base = (base) ? base + 1 : input;
+    
+    // Remove extension if present (like .mp3, .flac, etc.)
+    char name_without_ext[256];
+    strncpy(name_without_ext, base, sizeof(name_without_ext) - 1);
+    name_without_ext[sizeof(name_without_ext) - 1] = '\0';
+    
+    char *dot = strrchr(name_without_ext, '.');
+    if (dot) *dot = '\0';
+    
+    // Build full path: /tmp/tomu_cover_img/filename.jpg
+    snprintf(out, size, "/tmp/tomu_cover_img/%s.jpg", name_without_ext);
+}
+
 int make_dir(const char *path) {
     if (mkdir(path, 0755) == 0) {
         return 0; // created
@@ -269,65 +289,61 @@ int make_dir(const char *path) {
 
     return 1; // error
 }
-// helper: extract filename without path and extension
-static void build_output_path(const char *input, char *out, size_t size) {
-    const char *base = strrchr(input, '/');
-    base = (base) ? base + 1 : input;
-
-    char name[256];
-    strncpy(name, base, sizeof(name));
-    name[sizeof(name) - 1] = '\0';
-
-    // remove extension
-    char *dot = strrchr(name, '.');
-    if (dot) *dot = '\0';
-
-    snprintf(out, size, "/tmp/tomu_cover_img/%s.png", name);
-}
 
 int get_cover(AVFormatContext *fmt, const char *input) {
     char output[512];
-
-    build_output_path(input, output, sizeof(output));
-
-    printf("Saving to: %s\n", output);
-
+    
+    // Create directory first
     make_dir("/tmp/tomu_cover_img");
-
-    // 🔥 NEW: skip if file already exists
+    
+    // Build output path (now this actually does something!)
+    build_output_path(input, output, sizeof(output));
+    
+    printf("Looking for cover in: %s\n", input);
+    printf("Will save to: %s\n", output);
+    
+    // Skip if file already exists
     if (access(output, F_OK) == 0) {
-        printf("File already exists, skipping...\n");
+        printf("Cover already exists, skipping...\n");
         return 0;
     }
-
+    
+    // Search for attached picture in streams
     for (unsigned int i = 0; i < fmt->nb_streams; i++) {
         AVStream *stream = fmt->streams[i];
-
+        
         if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-
             AVPacket pkt = stream->attached_pic;
-
+            
             FILE *f = fopen(output, "wb");
             if (!f) {
-                printf("Could not create output file\n");
+                printf("Could not create output file: %s\n", output);
                 return 1;
             }
-
-            fwrite(pkt.data, 1, pkt.size, f);
+            
+            size_t written = fwrite(pkt.data, 1, pkt.size, f);
             fclose(f);
-
-            printf("Cover saved successfully\n");
-            return 0;
+            
+            if (written == pkt.size) {
+                printf("✅ Cover saved: %s (%zu bytes)\n", output, written);
+                return 0;
+            } else {
+                printf("⚠️ Cover partially written: %zu/%d bytes\n", written, pkt.size);
+                return 1;
+            }
         }
     }
-
-    printf("No cover found\n");
+    
+    printf("No cover art found in file\n");
     return 1;
 }
 
 int extract_cover(const char *input) {
-    if (get_cover(ctx.fmtCTX, input) == 0) return 0;
-
-    printf("No cover found\n");
-    return 1;
+    if (!input || !ctx.fmtCTX) {
+        printf("No file or format context\n");
+        return 1;
+    }
+    
+    printf("Extracting cover from: %s\n", input);
+    return get_cover(ctx.fmtCTX, input);
 }
