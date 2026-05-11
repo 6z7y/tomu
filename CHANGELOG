@@ -1,3 +1,21 @@
+# 6z7y 1.2.0_beta - 2026-05-11
+
+- remove static from some fn unnecssary
+- improve queue handling and playback state synchronization
+
+* tomu:
+  - add Discord rich presence integration
+  - fix crashes during playback lifecycle and shutdown
+  - reduce audio buffer size from 0.8s to 0.3s for lower latency
+  - improve metadata handling and cleanup logic
+  - refactor backend flow and simplify initialization path
+
+* tomucli:
+  - add configurable progress bar width in config
+  - refactor event loop and server synchronization logic
+  - simplify file handling and move playback control to server
+  - improve status update and queue processing flow
+
 # 6z7y 1.1.2_beta - 2026-05-04
 
 - switched optimization from O3 to O0 for better debuggability
