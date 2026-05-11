@@ -2,13 +2,13 @@
 #include <string.h>
 
 #include "../shared/SHARE_DATA.h"
-#include "utils.h"
+#include "../shared/share_utils.h"
 
 // arg compare opts
-static const char *help_opts[] = {"--help", "-h", NULL};       // help
-static const char *ver_opts[]  = {"--version", "-v", NULL}; // version
+const char *help_opts[] = {"--help", "-h", NULL};       // help
+const char *ver_opts[]  = {"--version", "-v", NULL}; // version
 
-static inline void help()
+void help()
 {
   printf(
       "Usage: tomu\n\n"
@@ -17,7 +17,7 @@ static inline void help()
   );
 }
 
-static inline int match_opt(const char *arg, const char **opts)
+int match_opt(const char *arg, const char **opts)
 {
   for (int i=0; opts[i]; i++)
       if (!strcmp(arg, opts[i])) return 1;
