@@ -79,6 +79,8 @@ $(SHARED_BUILD_DIR)/%.o: $(SHARED_DIR)/%.c
 
 # install
 install: all
+	mkdir -p $(HOME)/.config/tomu
+	install -m755 discord_rich_presence.py ~/.config/tomu/
 	sudo install -m755 $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUTUI_NAME) $(TOMUGUI_NAME) $(INSTALL_PATH)
 
 # clean
