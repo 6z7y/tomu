@@ -1,8 +1,8 @@
 #ifndef SHARE_DATA
 #define SHARE_DATA
 
-#define SOCKET_PATH "/tmp/tomu-sock" // path socket file
-#define MAX_CLIENT 6 // limit client connection
+#define SOCKET_PATH "/tmp/tomu.sock" // path socket file
+#define MAX_CLIENT 7 // limit client connection
 
 // server info
 #define TOMU_NAME "tomu"
@@ -17,10 +17,6 @@
 
 #define TOMUGUI_NAME "tomugui"
 #define TOMUGUI_VER "X.X.X"
-
-// Utils
-#define false 0
-#define true 1
 
 typedef enum { // types
   CLIENT_CLI,
