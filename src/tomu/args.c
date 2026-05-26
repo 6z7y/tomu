@@ -1,12 +1,13 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../shared/SHARE_DATA.h"
 #include "../shared/share_utils.h"
 
 // arg compare opts
-const char *help_opts[] = {"--help", "-h", NULL};       // help
-const char *ver_opts[]  = {"--version", "-v", NULL}; // version
+const char *help_opts[] = {"--help", "help", "-h", NULL};       // help
+const char *ver_opts[]  = {"--version", "version", "-v", NULL}; // version
 
 void help()
 {
@@ -26,21 +27,13 @@ int match_opt(const char *arg, const char **opts)
 }
 
 // handle command-line arguments
-int args_handle(const char *option)
+void args_handle(const char *option)
 {
-  if (!option) return 0; // no arguments given, continue normally
+  if      (match_opt(option, help_opts)) help();
 
-  // there "--arg"
-  if (option[0] == '-') {
+  else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
 
-    if      (match_opt(option, help_opts)) help();
+  else    warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
 
-    else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
-
-    else    warn("[T]: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
-
-    return 1;
-  }
-
-  return 0;
+  exit(0);
 }
