@@ -27,36 +27,6 @@ typedef struct {
 } CLIENTS_SYSTEM;
 // -----------------------------
 
-typedef struct {
-    char *title;          // song name
-    char *artist;         // who made the song
-    char *album;          // album name
-    char *album_artist;   // album owner
-    char *genre;          // classification
-    char *date;           // releases time
-    char *track;          // track number
-
-} Audio_Metadata;
-
-// struct handle Playback
-typedef struct {
-  Audio_Metadata metadata;
-  int running;
-  int paused;
-  int duration;
-  int position;
-  int skip_to_next;
-  float volume;
-  float speed;
-  atomic_int looping;
-  uint shuffle;
-  int seek_request;
-  int64_t seek_target;
-  int playback_finsh;
-  pthread_mutex_t lock;
-  pthread_cond_t wait_cond;
-
-} Audio_State;
 
 typedef struct {
   uint8_t *pcm_data;
@@ -94,7 +64,7 @@ typedef struct PlayBackContext{
   AVFormatContext *fmtCTX; // Structure audio file
   AVCodecContext *codecCTX; // decoder running
   Audio_Buffer *buf;
-  Audio_State state;
+  TomuStatus state;
   Audio_Info inf; // information audio
   CLIENTS_SYSTEM client[MAX_CLIENT]; // client handle
   char *queue_list[200];
@@ -104,6 +74,7 @@ typedef struct PlayBackContext{
   int playback_active;
   int server_fd;
   int client_fd;
+  int discord_rich_presence;
 
 } PlayBackContext;
 

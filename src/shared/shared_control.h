@@ -1,6 +1,10 @@
 #ifndef SHARED_CONTROL_H
 #define SHARED_CONTROL_H
 
+#include <stdint.h>
+#include <stdatomic.h>
+#include <pthread.h>
+
 typedef enum {
   CMD_PLAY_TOGGLE,
   CMD_STOP,
@@ -22,14 +26,33 @@ typedef enum {
 } Command;
 
 typedef struct {
-  int   duration;
-  int   position;
-  int   paused;
+    char title[128];          // song name
+    char artist[128];         // who made the song
+    char album[128];          // album name
+    char album_artist[128];   // album owner
+    char genre[128];          // classification like role or key value
+    char date[128];           // releases time
+    char track[128];          // track number
+
+} Audio_Metadata;
+
+// struct handle Playback
+typedef struct {
+  Audio_Metadata metadata;
+  int running;
+  int paused;
+  int duration;
+  int position;
+  int skip_to_next;
   float volume;
   float speed;
-  int   shuffle;
-  int   loop;
-  int   playback_running;
+  atomic_int looping;
+  int shuffle;
+  int seek_request;
+  int64_t seek_target;
+  int playback_finsh;
+  pthread_mutex_t lock;
+  pthread_cond_t wait_cond;
 
 } TomuStatus;
 
