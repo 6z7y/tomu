@@ -1,3 +1,22 @@
+# 6z7y 1.3.0_beta - 2026-05-26
+
+- Create ~/.config/tomu directory if not exists (now server/clients settings will be here)
+- move discord_rich_presence to script python
+- change client broadcast data from struct to JSON format
+
+* tomu 
+- Add config file support with discord_rich_presence toggle
+- Add JSON broadcast with status + metadata fields
+- Replace Audio_State with shared TomuStatus
+- Add sleep_ms(100) to reduce CPU usage
+
+* tomucli
+- Add parse_json() for parsing server JSON status
+- Move config to ~/.config/tomu/tomucli.conf
+- Fix progress bar display (was commented out)
+- Update field names (running, looping)
+- Remove binary struct reading
+
 # 6z7y 1.2.0_beta - 2026-05-11
 
 - remove static from some fn unnecssary
