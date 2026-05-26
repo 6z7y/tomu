@@ -10,6 +10,7 @@
 #include "../shared/SHARE_DATA.h"
 #include "../shared/share_utils.h"
 #include "CLIENT_DATA.h"
+#include "control.h"
 #include "file_handle.h"
 
 // arg compare opts
