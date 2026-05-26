@@ -2,6 +2,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
 #include <dirent.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -183,7 +184,7 @@ void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_s
   }
 }
 
-void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
+void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle)
 {
   state->running = 1;
   state->paused = 0;
@@ -203,7 +204,7 @@ void init_playbackstatus(Audio_State *state, uint loop, uint shuffle)
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
 {
   Audio_Info *inf = &ctx.inf;
-  Audio_State *state = &ctx.state;
+  TomuStatus *state = &ctx.state;
   AVFormatContext *fmtCTX = ctx.fmtCTX;
   AVCodecContext *codecCTX = ctx.codecCTX;
 
@@ -239,24 +240,30 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
 
 void get_metadata()
 {
-  // free PREVIOUS song metadata first
   Audio_Metadata *m = &ctx.state.metadata;
-  free(m->title); free(m->artist); free(m->album);
-  free(m->album_artist); free(m->genre);
-  free(m->date);  free(m->track);
+  
+  // Clear arrays (no freeing needed)
   memset(m, 0, sizeof(*m));
-
-  // now load new metadata
+  
   AVDictionaryEntry *tag = NULL;
   while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    if      (!strcmp(tag->key, "title"))        m->title        = strdup(tag->value);
-    else if (!strcmp(tag->key, "artist"))       m->artist       = strdup(tag->value);
-    else if (!strcmp(tag->key, "album"))        m->album        = strdup(tag->value);
-    else if (!strcmp(tag->key, "album_artist")) m->album_artist = strdup(tag->value);
-    else if (!strcmp(tag->key, "genre"))        m->genre        = strdup(tag->value);
-    else if (!strcmp(tag->key, "date"))         m->date         = strdup(tag->value);
-    else if (!strcmp(tag->key, "track"))        m->track        = strdup(tag->value);
+    // if (!strcmp(tag->key, "title"))        strncpy(m->title, tag->value, sizeof(m->title) - 1);
+    if (!strcmp(tag->key, "artist"))  strncpy(m->artist, tag->value, sizeof(m->artist) - 1);
+    else if (!strcmp(tag->key, "album"))   strncpy(m->album, tag->value, sizeof(m->album) - 1);
+    else if (!strcmp(tag->key, "album_artist")) strncpy(m->album_artist, tag->value, sizeof(m->album_artist) - 1);
+    else if (!strcmp(tag->key, "genre"))   strncpy(m->genre, tag->value, sizeof(m->genre) - 1);
+    else if (!strcmp(tag->key, "date"))    strncpy(m->date, tag->value, sizeof(m->date) - 1);
+    else if (!strcmp(tag->key, "track"))   strncpy(m->track, tag->value, sizeof(m->track) - 1);
   }
+  
+  // Ensure null termination
+  // m->title[sizeof(m->title)-1] = '\0';
+  m->artist[sizeof(m->artist)-1] = '\0';
+  m->album[sizeof(m->album)-1] = '\0';
+  m->album_artist[sizeof(m->album_artist)-1] = '\0';
+  m->genre[sizeof(m->genre)-1] = '\0';
+  m->date[sizeof(m->date)-1] = '\0';
+  m->track[sizeof(m->track)-1] = '\0';
 }
 
 ///////////////////////////////////////////////////// about extract cover img
@@ -270,9 +277,13 @@ void build_output_path(const char *input, char *out, size_t size) {
     char name_without_ext[256];
     strncpy(name_without_ext, base, sizeof(name_without_ext) - 1);
     name_without_ext[sizeof(name_without_ext) - 1] = '\0';
+
     
     char *dot = strrchr(name_without_ext, '.');
     if (dot) *dot = '\0';
+
+    strcpy(ctx.state.metadata.title, name_without_ext);
+    printf("name: titile : %s\n", ctx.state.metadata.title);
     
     // Build full path: /tmp/tomu_cover_img/filename.jpg
     snprintf(out, size, "/tmp/tomu_cover_img/%s.jpg", name_without_ext);
