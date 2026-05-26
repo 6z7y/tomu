@@ -32,6 +32,12 @@ sudo dnf install ffmpeg-devel -y
 sudo pacman -S ffmpeg
 ```
 
+
+#### python libs
+```bash
+pip install pypresence requests --break-system-packages
+```
+
 ## Installation
 
 Clone the project:
