@@ -7,24 +7,9 @@
 #include <sys/un.h>
 
 #include "socket_utils.h"
+#include "DATA.h"
 #include "control.h"
 #include "../shared/share_utils.h"
-
-// function used for reading from socket
-// static inline void read_sock(int client_fd)
-// {
-//   char msg[256];
-//   int r = read(client_fd, msg, sizeof(msg) - 1);
-//
-//   if (r > 0) {
-//     msg[r] = 0;
-//     printf("%s", msg);
-//     fflush(stdout);
-//   }
-//   else if (r == 0) {printf("client dissconnect\n"); close(client_fd);}
-//   else {perror("read");}
-// }
-
 
 // function for kill client
 void client_die(int i, CLIENTS_SYSTEM *client)
@@ -50,23 +35,51 @@ int add_client_into_poll(struct pollfd *fds, CLIENTS_SYSTEM *client)
 }
 
 // function for send status for clients
-TomuStatus status;
+// TomuStatus status;
+static void create_json_fmt(char *msg, size_t msg_size)
+{
+  TomuStatus *s = &ctx.state;
+  snprintf(msg, msg_size,
+      "{"
+      "  \"status\": {"
+      "    \"duration\":%d,"
+      "    \"position\":%d,"
+      "    \"paused\":%d,"
+      "    \"volume\":%.1f,"
+      "    \"speed\":%.2f,"
+      "    \"shuffle\":%d,"
+      "    \"loop\":%d,"
+      "    \"playback_running\":%d"
+      "  },"
+      "  \"metadata\": {"
+      "    \"title\":\"%s\","
+      "    \"artist\":\"%s\","
+      "    \"album\":\"%s\","
+      "    \"album_artist\":\"%s\","
+      "    \"genre\":\"%s\","
+      "    \"date\":\"%s\","
+      "    \"track\":\"%s\""
+      "  }"
+      "}",
+      s->duration, s->position, s->paused, s->volume, s->speed, 
+      s->shuffle, s->looping, s->running,
+      s->metadata.title, s->metadata.artist, s->metadata.album, 
+      s->metadata.album_artist, s->metadata.genre, s->metadata.date, s->metadata.track
+  );
+}
+
 void broadcast_status(CLIENTS_SYSTEM *client)
 {
   if (!ctx.playback_active) return;
 
-  status.duration  = ctx.state.duration;
-  status.position  = ctx.state.position;
-  status.paused    = ctx.state.paused;
-  status.volume    = ctx.state.volume;
-  status.speed     = ctx.state.speed;
-  status.shuffle   = ctx.state.shuffle;
-  status.loop      = ctx.state.looping;
-  status.playback_running = ctx.state.running;
-
+  char json_msg[1024];
+  create_json_fmt(json_msg, sizeof(json_msg));  // Pass buffer size
+  
+  size_t len = strlen(json_msg) + 1;
+  
   for_each_num(MAX_CLIENT) {
     if (client[i].active) {
-      write_now_struct(client[i].fd, &status, sizeof(status));
+      write(client[i].fd, json_msg, len);
     }
   }
 }
@@ -121,14 +134,13 @@ void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
   if (cmd == CMD_PATH) {
     size_t pathlen = 0;
     read(client[i].fd, &pathlen, sizeof(int));
-    if (pathlen > 0 && pathlen < 2048) {
+    if (pathlen > 0) {
       char *path = malloc(pathlen + 1);
       read(client[i].fd, path, pathlen);
       path[pathlen] = '\0';
 
       if (ctx.queue_count < 200) {
           ctx.queue_list[ctx.queue_count] = strdup(path);
-          printf("add %s in list %d\n", ctx.queue_list[ctx.queue_count], ctx.queue_count);
           ctx.queue_count++;
       }
       free(path);
@@ -187,11 +199,24 @@ void start_playback(char *path) {
 // socket mode ( 1 = start ), ( 0 = close )
 void server_socket_mode(int *server_fd, int ON)
 {
-  unlink(SOCKET_PATH); // remove old socket file
-
   if (ON) {
+    char socket_path[512];
+
     // initlize socket protocol
     struct sockaddr_un addr = { AF_UNIX, SOCKET_PATH };
+
+    // test if tomu running
+    int test_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (connect(test_fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+      close(test_fd);
+      printf("tomu: already running\n");
+      exit(0);
+    }
+    close(test_fd);
+
+    unlink(SOCKET_PATH); // remove old socket file
+
+    // init protocol socket
     *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (*server_fd < 0) die("Socket:");
 
@@ -202,5 +227,9 @@ void server_socket_mode(int *server_fd, int ON)
     if (listen(*server_fd, MAX_CLIENT) < 0) die("Listen:");
   }
 
-  else close(*server_fd);
+  else {
+    unlink(SOCKET_PATH); // remove old socket file
+
+    close(*server_fd);
+  }
 }
