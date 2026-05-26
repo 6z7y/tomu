@@ -4,7 +4,7 @@
 
 #include "DATA.h"
 #include "args.h"
-#include "discord_integration.h"
+#include "config.h"
 #include "socket_utils.h"
 
 PlayBackContext ctx = {0}; // tomu_context
@@ -14,9 +14,15 @@ int main(int argc, char **argv)
   signal(SIGINT, sig_clean);
   signal(SIGPIPE, SIG_IGN); // don't crash on write to closed socket
 
-  discord_init();  // ADD THIS - connects to Discord
+  // discord_init();  // ADD THIS - connects to Discord
+  if (argc > 1) args_handle(argv[argc - 1]); // argument handle
 
-  if (args_handle(argv[argc - 1])) goto bye; // argument handle
+  // init config folder
+  load_config();
+  if (ctx.discord_rich_presence) {
+    run_command("python3 ~/.config/tomu/discord_rich_presence.py &");
+  }
+
   // 1. init socket
   int *server_fd = &ctx.server_fd;
   int *client_fd = &ctx.client_fd;
@@ -38,7 +44,7 @@ int main(int argc, char **argv)
 
     if (ctx.state.running) {
       broadcast_status(client); // update status when play audio
-      discord_update_presence();  // ADD THIS - updates Discord when song changes
+      // discord_update_presence();  // ADD THIS - updates Discord when song changes
     }
 
     // fd[0] Accept new Client
@@ -47,17 +53,14 @@ int main(int argc, char **argv)
     // fd[1] read keys
     int index = 1; // begin from 1 for clients, server take 0
     for_each_num(MAX_CLIENT) {
-      if (!client[i].active) continue;
-
-      if (fds[index].revents & POLLIN && index < nfds) 
+      if (fds[index].revents & POLLIN && index < nfds && client[i].active) 
           handle_client_events(i, fds, client);
 
       index++;
     }
-
+    sleep_ms(100);
   }
 
 bye: 
-  discord_cleanup();  // ADD THIS - cleanup on exit
   return 0;
 }
