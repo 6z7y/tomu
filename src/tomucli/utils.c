@@ -26,14 +26,14 @@ void client_socket_mode(int *server_fd, int ON)
   if (ON) {
     // 1. create socket
     struct sockaddr_un addr = { .sun_family = AF_UNIX, .sun_path = SOCKET_PATH };
-    *server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (*server_fd < 0) die("Socket:");
+
+    if ((*server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) die("Socket:");
 
     // 2. Connect socket
     if (connect(*server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
       die("Connect failed, make sure server running");
     
-    // 3. send type
+    // 3. send type client
     write_now_enum(*server_fd, ClientType, CLIENT_CLI);
   }
 
