@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -22,14 +21,13 @@
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
-
 // decoder thread
 void *run_decoder(void *arg)
 {
   AVFormatContext *fmtCTX = ctx.fmtCTX;
   AVCodecContext *codecCTX = ctx.codecCTX;
   Audio_Info *inf = &ctx.inf;
-  Audio_State *state = &ctx.state;
+  TomuStatus *state = &ctx.state;
 
   SwrContext *swrCTX = NULL;        // resampler for sample format changes
   SwrContext *speed_swrCTX = NULL;  // Separate resampler for playback speed changes
@@ -108,7 +106,7 @@ decode:
         while (state->paused)
           pthread_cond_wait(&state->wait_cond, &state->lock);
           
-        if (state->running == false) break;
+        if (state->running == FALSE) break;
         // progress(state, current_time, duration_sec);
         pthread_mutex_unlock(&state->lock);
 

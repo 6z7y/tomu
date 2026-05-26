@@ -19,7 +19,7 @@ int get_audioStream();
 int get_audio_info(const char *filename);
 int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX);
 void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX);
-void init_playbackstatus(Audio_State *state, uint loop, uint shuffle);
+void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle);
 
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played);
 

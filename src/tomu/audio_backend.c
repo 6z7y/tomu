@@ -86,7 +86,7 @@ void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
 {
   Audio_Info *inf = &ctx.inf;
-  Audio_State *state = &ctx.state;
+  TomuStatus *state = &ctx.state;
 
     // Check pause state
     pthread_mutex_lock(&state->lock);

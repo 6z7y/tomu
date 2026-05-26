@@ -12,7 +12,7 @@
 
 typedef struct {
   Command key;
-  void (*handler)(Audio_State*);
+  void (*handler)(TomuStatus*);
 } KeyMap;
 
 static const KeyMap keymap[] = {
@@ -38,7 +38,7 @@ static const KeyMap keymap[] = {
 // void send_cmd(int sock, Command cmd)
 // { write(sock, &cmd, sizeof(Command)); }
 
-void handle_key(Command cmd, Audio_State *state)
+void handle_key(Command cmd, TomuStatus *state)
 {
   for (int i = 0; i < (sizeof(keymap) / sizeof(keymap[0])); i++)
     if (cmd == keymap[i].key) keymap[i].handler(state);
@@ -47,7 +47,7 @@ void handle_key(Command cmd, Audio_State *state)
 // control playback (stop/resume/stop)
 // functions for playback
 // fn toggle pause/resume
-void playback_toggle(Audio_State *state)
+void playback_toggle(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     state->paused = !state->paused;
@@ -56,7 +56,7 @@ void playback_toggle(Audio_State *state)
 }
 
 // Stops playback and wakes any waiting threads
-void playback_stop(Audio_State *state){
+void playback_stop(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->skip_to_next = 0;
     state->running = 0;
@@ -69,7 +69,7 @@ void playback_stop(Audio_State *state){
 // control audio seek
 
 // Requests a seek forward by 5 seconds
-void seek_forward_sec(Audio_State *state)
+void seek_forward_sec(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     if (!state->seek_request){
@@ -82,7 +82,7 @@ void seek_forward_sec(Audio_State *state)
 
 
 // Requests a seek forward by 1 min
-void seek_forward_min(Audio_State *state)
+void seek_forward_min(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     if (!state->seek_request){
@@ -94,7 +94,7 @@ void seek_forward_min(Audio_State *state)
 }
 
 // Requests a seek backward by 5 seconds
-void seek_backward_sec(Audio_State *state)
+void seek_backward_sec(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     if (!state->seek_request){
@@ -106,7 +106,7 @@ void seek_backward_sec(Audio_State *state)
 }
 
 // Requests a seek backward by 1 min
-void seek_backward_min(Audio_State *state)
+void seek_backward_min(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     if (!state->seek_request){
@@ -120,7 +120,7 @@ void seek_backward_min(Audio_State *state)
 // =================================================================
 
 // control speed playback
-void playback_speed_defualt(Audio_State *state)
+void playback_speed_defualt(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     state->speed = 1.00f;
@@ -128,7 +128,7 @@ void playback_speed_defualt(Audio_State *state)
 }
 
 
-void playback_speed_increase(Audio_State *state)
+void playback_speed_increase(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     state->speed += 0.05f;
@@ -136,7 +136,7 @@ void playback_speed_increase(Audio_State *state)
   }
 }
 
-void playback_speed_decrease(Audio_State *state)
+void playback_speed_decrease(TomuStatus *state)
 {
   WITH_LOCK(state->lock) {
     state->speed -= 0.05f;
@@ -148,14 +148,14 @@ void playback_speed_decrease(Audio_State *state)
 
 // control volume playback
 
-inline void volume_increase(Audio_State *state){
+inline void volume_increase(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->volume += 0.02f;
     if (state->volume > 1.26f) state->volume = 1.26f;
   }
 }
 
-inline void volume_decrease(Audio_State *state){
+inline void volume_decrease(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->volume -= 0.02f;
     if (state->volume < 0.00f) state->volume = 0.00f;
@@ -164,7 +164,7 @@ inline void volume_decrease(Audio_State *state){
 // ===================================================================
 
 // loop toggle
-inline void loop_toggle(Audio_State *state){
+inline void loop_toggle(TomuStatus *state){
   state->looping = !state->looping;
   // WITH_LOCK(state->lock) {
   // pthread_cond_broadcast(&state->wait_cond);
@@ -172,7 +172,7 @@ inline void loop_toggle(Audio_State *state){
 }
 
 // shuffle toggle
-void shuffle_toggle(Audio_State *state) {
+void shuffle_toggle(TomuStatus *state) {
   WITH_LOCK(state->lock) {
     state->shuffle = !state->shuffle;
   pthread_cond_broadcast(&state->wait_cond);
@@ -180,7 +180,7 @@ void shuffle_toggle(Audio_State *state) {
 }
 
 // prev/next playback
-inline void playback_next_audio(Audio_State *state){
+inline void playback_next_audio(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->skip_to_next = 1;
     state->running = 0;
@@ -188,7 +188,7 @@ inline void playback_next_audio(Audio_State *state){
   }
 }
 
-inline void playback_prev_audio(Audio_State *state){
+inline void playback_prev_audio(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->skip_to_next = -1;
     state->running = 0;

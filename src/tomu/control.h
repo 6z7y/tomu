@@ -6,27 +6,27 @@
 
 void send_cmd(int sock, Command cmd);
 
-void handle_key(Command cmd, Audio_State *state);
+void handle_key(Command cmd, TomuStatus *state);
 
-void playback_toggle(Audio_State *state);
-void playback_stop(Audio_State *state);
+void playback_toggle(TomuStatus *state);
+void playback_stop(TomuStatus *state);
 
-void seek_forward_sec(Audio_State *state);
-void seek_forward_min(Audio_State *state);
-void seek_backward_sec(Audio_State *state);
-void seek_backward_min(Audio_State *state);
+void seek_forward_sec(TomuStatus *state);
+void seek_forward_min(TomuStatus *state);
+void seek_backward_sec(TomuStatus *state);
+void seek_backward_min(TomuStatus *state);
 
-void playback_speed_defualt(Audio_State *state);
-void playback_speed_increase(Audio_State *state);
-void playback_speed_decrease(Audio_State *state);
+void playback_speed_defualt(TomuStatus *state);
+void playback_speed_increase(TomuStatus *state);
+void playback_speed_decrease(TomuStatus *state);
 
-void volume_increase(Audio_State *state);
-void volume_decrease(Audio_State *state);
+void volume_increase(TomuStatus *state);
+void volume_decrease(TomuStatus *state);
 
-void shuffle_toggle(Audio_State *state);
-void loop_toggle(Audio_State *state);
+void shuffle_toggle(TomuStatus *state);
+void loop_toggle(TomuStatus *state);
 
-void playback_next_audio(Audio_State *state);
-void playback_prev_audio(Audio_State *state);
+void playback_next_audio(TomuStatus *state);
+void playback_prev_audio(TomuStatus *state);
 
 #endif
