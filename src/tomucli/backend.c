@@ -13,16 +13,17 @@
 
 int update_status(int fd, int *was_playing, TomuStatus *status, PlaybackQueue *queue)
 {
-  if (*was_playing && !status->playback_running) {
+  if (*was_playing && !status->running) {
       // Playback just finished -> send next file if in queue mode
       if (queue->has_queue && queue->dir.totalFiles > 0) {
           // Move to next file (or loop/shuffle)
           queue->current_index++;
+
           if (status->shuffle) {
               queue->dir.rand_num = get_rand();
               queue->current_index = queue->dir.rand_num % queue->dir.totalFiles;
           } else if (queue->current_index >= queue->dir.totalFiles) {
-              if (status->loop)
+              if (status->looping)
                   queue->current_index = 0;
               else {
                 ctx.running = 1;
@@ -38,18 +39,10 @@ int update_status(int fd, int *was_playing, TomuStatus *status, PlaybackQueue *q
           printf("\nPlaying: %s\n", queue->dir.files[queue->current_index]);
       }
   }
-  *was_playing = status->playback_running;
+  *was_playing = status->running;
   progress(status, status->position, status->duration);
   return 1;
 }
-
-// void print_header(const char *filename)
-// {
-//   printf("\033[?25l");
-//   printf("Playing: %s\n", filename);
-//   // printf("%.2dHz, %dch, %s\n", sample_rate, channels, fmt_name);  // row 2
-//   fflush(stdout);
-// }
 
 void progress(TomuStatus *status, double current_time, int duration_time)
 {
@@ -69,7 +62,7 @@ void progress(TomuStatus *status, double current_time, int duration_time)
     get_hour(duration_time), get_min(duration_time), get_sec(duration_time),
     (current_time / duration_time) * 100.0,
     status->speed, status->volume * 100.0f,
-    status->shuffle, status->loop
+    status->shuffle, status->looping
   );
   fflush(stdout);
 }
