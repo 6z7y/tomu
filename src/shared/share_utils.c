@@ -31,6 +31,7 @@ int is_valid_path(const char *path)
   return (access(path, F_OK) == 0);
 }
 
+// build string and return it
 char *format(const char *fmt, ...)
 {
   // read args
@@ -63,9 +64,7 @@ void verr(const char *fmt, va_list ap)
 	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
 		fputc(' ', stderr);
 		perror(NULL);
-	} else {
-		fputc('\n', stderr);
-	}
+	} else { fputc('\n', stderr); }
 }
 
 int warn(const char *fmt, ...)
