@@ -12,7 +12,6 @@ void save_config(FILE **f, char *home_path, char *path_parent, char *path_file)
   // make dir first
   printf("Setting default config...\n");
 
-  run_command(format("mkdir -p %s/.config/tomucli", home_path));
 
   // write file
   *f = fopen(path_file, "w");
@@ -30,10 +29,10 @@ void load_config()
   char *home_path = getenv("HOME");
 
   char path_parent[128]; // file parent
-    strcpy(path_parent, format("%s/.config/tomucli", home_path));
+    strcpy(path_parent, format("%s/.config/tomu", home_path));
 
   char path_file[128]; // file path
-    strcpy(path_file, format("%s/.config/tomucli/config.conf", home_path));
+    strcpy(path_file, format("%s/.config/tomu/tomucli.conf", home_path));
 
   // 2. Read file
   FILE *f = fopen(path_file, "r");
