@@ -17,6 +17,7 @@ typedef struct {
   ProgressBarStyle progress;
 } CONFIG;
 //----------------------------
+
 typedef struct {
   char **files; // array store name files
   char base_path[1024]; // for dir and random
@@ -35,8 +36,8 @@ typedef struct {
 
 typedef struct {
   CONFIG cfg;
-  PlaybackQueue queue;
   TomuStatus status;
+  PlaybackQueue queue;
   int server_fd;
   int running;
 } Client_CTX;
