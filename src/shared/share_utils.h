@@ -27,6 +27,10 @@
 #define get_min(a) (((int)a % 3600) / 60) // convert time to min
 #define get_sec(a) ((int)a % 60) // convert time to sec
 
+// Utils
+#define FALSE 0
+#define TRUE 1
+
 // sleeping
 #define sleep_ms(n) usleep(1000*n)
 
