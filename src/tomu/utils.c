@@ -5,13 +5,12 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "discord_integration.h"
 #include "socket_utils.h"
 #include "utils.h"
 
 void sig_clean(int sig)
 {
-  discord_cleanup();  // ADD THIS - cleanup on Ctrl+C
+  if (ctx.discord_rich_presence) run_command("kill discord_rich_presence");
   for (int i = 0; i < ctx.queue_count; i++)
     free(ctx.queue_list[i]);
 
