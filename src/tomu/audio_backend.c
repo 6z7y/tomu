@@ -18,7 +18,12 @@
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)
 {
   pthread_mutex_lock(&buf->lock);
-  
+
+  if (data_must_write <= 0 || data_must_write > buf->capacity) {
+    pthread_mutex_unlock(&buf->lock);
+    return;
+  }
+
   while (buf->filled + data_must_write > buf->capacity) {
     pthread_cond_wait(&buf->space_free, &buf->lock);
   }
