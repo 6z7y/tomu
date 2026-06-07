@@ -6,6 +6,25 @@
 #include <pthread.h>
 
 typedef enum {
+    KY_ESC = 27,
+
+    KY_SPACE = ' ',
+    KY_PLUS = '+',
+    KY_MINUS = '-',
+    KY_LBRACKET = '[',
+    KY_RBRACKET = ']',
+    KY_BACKSPACE = 127,
+
+    // custom keys (not ASCII)
+    KY_UP = 1000,
+    KY_DOWN,
+    KY_RIGHT,
+    KY_LEFT,
+
+    KY_ENTER = 1100,
+} KeyCode;
+
+typedef enum {
   CMD_PLAY_TOGGLE,
   CMD_STOP,
   CMD_NEXT_AUDIO,
@@ -21,7 +40,11 @@ typedef enum {
   CMD_SEEK_BACKWARD_1M,
   CMD_LOOP_TOGGLE,
   CMD_SHUFFLE_TOGGLE,
+
   CMD_PATH,
+  CMD_FIRST_INFOS,
+  CMD_STATUS,
+  CMD_END
 
 } Command;
 
