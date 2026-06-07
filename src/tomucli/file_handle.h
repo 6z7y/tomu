@@ -11,7 +11,7 @@
 #include "../shared/shared_control.h"
 
 void queue_free(PlaybackQueue *queue);
-void path_handle(int server_fd, const char *path, PlaybackQueue *queue);
+void path_handle(const char *path, PlaybackQueue *queue);
 void extractDir(const char *path, Dir_File *dir);
 
 #endif
