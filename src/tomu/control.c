@@ -8,7 +8,7 @@
 #include <sys/un.h>
 
 #include "control.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 
 typedef struct {
   Command key;
@@ -144,10 +144,7 @@ void playback_speed_decrease(TomuStatus *state)
   }
 }
 
-// =================================================================
-
 // control volume playback
-
 inline void volume_increase(TomuStatus *state){
   WITH_LOCK(state->lock) {
     state->volume += 0.02f;
@@ -161,14 +158,10 @@ inline void volume_decrease(TomuStatus *state){
     if (state->volume < 0.00f) state->volume = 0.00f;
   }
 }
-// ===================================================================
 
 // loop toggle
 inline void loop_toggle(TomuStatus *state){
   state->looping = !state->looping;
-  // WITH_LOCK(state->lock) {
-  // pthread_cond_broadcast(&state->wait_cond);
-  // }
 }
 
 // shuffle toggle
