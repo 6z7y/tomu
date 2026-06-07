@@ -9,7 +9,7 @@
 #include "socket_utils.h"
 #include "DATA.h"
 #include "control.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 
 // function for kill client
 void client_die(int i, CLIENTS_SYSTEM *client)
@@ -75,11 +75,13 @@ void broadcast_status(CLIENTS_SYSTEM *client)
   char json_msg[1024];
   create_json_fmt(json_msg, sizeof(json_msg));  // Pass buffer size
   
+  Command cmd = CMD_STATUS;
   size_t len = strlen(json_msg) + 1;
   
   for_each_num(MAX_CLIENT) {
     if (client[i].active) {
-      write(client[i].fd, json_msg, len);
+      write(client[i].fd, &cmd, sizeof(cmd)); // send flag
+      write(client[i].fd, json_msg, len); // send status
     }
   }
 }
@@ -127,7 +129,6 @@ void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
   // if client quit will read this
   if (n <= 0) {
     client_die(i, client);
-    printf("test here handle_client_event()\n");
     return;  // ← return early, don't fall through
   }
 
@@ -136,17 +137,21 @@ void handle_client_events(int i, struct pollfd *fds, CLIENTS_SYSTEM *client)
     read(client[i].fd, &pathlen, sizeof(int));
     if (pathlen > 0) {
       char *path = malloc(pathlen + 1);
-      read(client[i].fd, path, pathlen);
+      if (read(client[i].fd, path, pathlen) < 0) {
+        warn("the path:");
+        return;
+      }
+
       path[pathlen] = '\0';
 
-      if (ctx.queue_count < 200) {
-          ctx.queue_list[ctx.queue_count] = strdup(path);
-          ctx.queue_count++;
-      }
+      ctx.list.queue_list = realloc(ctx.list.queue_list, sizeof(char *) * (ctx.list.queue_count + 1));
+      ctx.list.queue_list[ctx.list.queue_count] = strdup(path);
+      ctx.list.queue_count++;
+
       free(path);
 
       // only start if nothing is playing
-      if (!ctx.playback_active) start_playback(ctx.queue_list[ctx.queue_index]);
+      if (!ctx.playback_active) start_playback(ctx.list.queue_list[ctx.list.queue_index]);
     }
   }
 
@@ -167,29 +172,36 @@ void *start_playback_thread(void *arg) {
     ctx.state.skip_to_next = 0;
 
     if (skip == -1) {
-        if (ctx.queue_index > 0) ctx.queue_index--;
+        if (ctx.list.queue_count > 0) ctx.list.queue_index--;
     } else {
-        ctx.queue_index++;
+        ctx.list.queue_index++;
     }
 
-    if (ctx.queue_index < ctx.queue_count) {
-        char *next = strdup(ctx.queue_list[ctx.queue_index]);
+    // about back prev or next audio playback
+    if (ctx.list.queue_index < ctx.list.queue_count) {
+      if (ctx.list.queue_index <= 0) ctx.list.queue_index = 0;
+        char *next = strdup(ctx.list.queue_list[ctx.list.queue_index]);
         pthread_t t;
         pthread_create(&t, NULL, start_playback_thread, next);
         pthread_detach(t);
         ctx.playback_thread = t;
         ctx.playback_active = 1;
     }
+    else if (ctx.list.queue_index > ctx.list.queue_count) {
+      if (ctx.list.queue_index >= ctx.list.queue_count) ctx.list.queue_index = ctx.list.queue_count;
+        char *next = strdup(ctx.list.queue_list[ctx.list.queue_index]);
+        pthread_t t;
+        pthread_create(&t, NULL, start_playback_thread, next);
+        pthread_detach(t);
+        ctx.playback_thread = t;
+        ctx.playback_active = 1;
+
+    };
     // else: queue exhausted, stay idle
     return NULL;
 }
 
 void start_playback(char *path) {
-    // if (ctx.playback_active) {
-    //     playback_stop(&ctx.state);
-    //     pthread_detach(ctx.playback_thread); // wait cleanly, don't detach
-    //     ctx.playback_active = 0;
-    // }
     char *copy = strdup(path); // thread owns this copy, safe to free
     pthread_create(&ctx.playback_thread, NULL, start_playback_thread, copy);
     pthread_detach(ctx.playback_thread); // wait cleanly, don't detach
