@@ -8,10 +8,9 @@
 #include <stdarg.h>
 
 #include "../shared/SHARE_DATA.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 #include "CLIENT_DATA.h"
 #include "control.h"
-#include "file_handle.h"
 
 // arg compare opts
 static const char *help_opts[] = {"--help", "help", "-h", "h", NULL};    // help
@@ -24,7 +23,7 @@ typedef struct {
 } list_cmd;
 
 static const list_cmd cmd_table[] = {
-/*     option           cmd                       desc               */
+/*    option           cmd                       desc               */
     {"set",         CMD_PATH,              "Send File path to queue"},
     {"toggle",      CMD_PLAY_TOGGLE,       "Play / pause toggle"},
     {"stop",        CMD_STOP,              "Stop playback"},
@@ -41,9 +40,8 @@ static const list_cmd cmd_table[] = {
     {"seek-60",     CMD_SEEK_BACKWARD_1M,  "Seek backward 1 minute"},
     {"loop",        CMD_LOOP_TOGGLE,       "Toggle loop mode"},
     {"shuffle",     CMD_SHUFFLE_TOGGLE,    "Toggle shuffle mode"},
-    {NULL, 0, NULL}
+    {NULL, -1, NULL}
 };
-
 
 int match_opt(const char *arg, const char **opts)
 {
@@ -69,7 +67,7 @@ int handle_remote(int fd, const char *option, const char *path)
   return 1;
 }
 
-static inline void help()
+void help()
 {
   printf(
     "Usage: tomucli [Dir/OR/File]\n"
@@ -99,8 +97,29 @@ static inline void help()
     " ([) = audio speed decrease\n"
     " (]) = audio speed increase\n"
     " (</>) = (Pervious/Next) audio\n"
+    " (?) = Show key bindings"
 
     "\nExample: tomu [FILE.mp3]\n"
+  );
+}
+
+void help_keys()
+{
+  printf(
+    "\nkeys:\n"
+    " (Space) = pause/resume\n"
+    " (Backspace) = reset playback speed\n"
+    " (q) = quit\n"
+    " (s) = shuffle toggle\n"
+    " (l) = loop toggle\n"
+    " (-) = decrease volume\n"
+    " (+) = increase volume\n"
+    " (↑/→) = audio seek forward +5s/1m\n"
+    " (←/↓) = audio seek backward -5s/1m\n"
+    " ([) = audio speed decrease\n"
+    " (]) = audio speed increase\n"
+    " (</>) = (Pervious/Next) audio\n"
+    " (?) = Show key bindings\n"
   );
 }
 
@@ -112,6 +131,8 @@ int args_handle(int fd, int argc, char **argv)
     if      (is_valid_path(option)) return 0; // check path exitsts
 
     else if (!handle_remote(fd, option, path)) goto last; // remote command
+
+    else if (!strcmp(option, "-no-filter")) {ctx.filter_files = 0; return 0;}
 
     else if (match_opt(option, help_opts)) help();
 
