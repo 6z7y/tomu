@@ -8,7 +8,7 @@
 #include "control.h"
 #include "utils.h"
 #include "../shared/SHARE_DATA.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 #include "file_handle.h"
 
 void sig_clean(int sig)
@@ -43,7 +43,5 @@ void client_socket_mode(int *server_fd, int ON)
 void init_context()
 {
   ctx.running = 1;
-  // ctx.queue.current_index = 0;     // Start at first file
-  // ctx.queue.file_played = 0;       // No file played yet
-  ctx.queue.dir.rand_num = get_rand();
+  ctx.filter_files = 1;
 }
