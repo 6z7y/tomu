@@ -3,21 +3,30 @@
 #include <string.h>
 
 #include "CLIENT_DATA.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 
 #define SIZE_BUF 64
+
+const char *config_fmt = 
+  "### Progress\n"
+  "width: \"32\"\n"
+  "done: \"=\"\n"
+  "current: \">\"\n"
+  "remaining: \".\"\n"
+  "color: \"red\" # also have [red, cyan]"
+;
 
 void save_config(FILE **f, char *home_path, char *path_parent, char *path_file)
 {
   // make dir first
   printf("Setting default config...\n");
 
-
   // write file
   *f = fopen(path_file, "w");
   if (!*f) die("config:");
 
-  fprintf(*f, "### Progress\nwidth: '32'\ndone: '='\ncurrent: '>'\nremaining: '.'");
+  fprintf(*f, "%s", config_fmt);
+//                                                                                      ^ NO \n at end
 
   fclose(*f);
   *f = fopen(path_file, "r");
@@ -50,28 +59,35 @@ void load_config()
 
     // 6. skip empty line or comment
     if (line[0] == '\0' || line[0] == '#') continue;
-
     // 7. read line and split
-    if (sscanf(line, "%[^:]: '%[^']'", key, value) == 2) {
+    if (sscanf(line, "%[^:]: \"%[^\"]\"", key, value) == 2) {
 
       if (!strcmp(key, "width")) {
-        printf("1key: (%s), with value: (%s)\n", key, value);
         ctx.cfg.progress.width = atoi(value);
       }
 
-      if (!strcmp(key, "done")) {
-        // printf("1key: (%s), with value: (%s)\n", key, value);
-        ctx.cfg.progress.done = value[0];
+      else if (!strcmp(key, "done")) {
+        strcpy(ctx.cfg.progress.done, value);
+        ctx.cfg.progress.done[sizeof(ctx.cfg.progress.done) - 1] = '\0';
+
       }
 
-      if (!strcmp(key, "current")) {
-        // printf("2key: (%s), with value: (%s)\n", key, value);
-        ctx.cfg.progress.current = value[0];
+      else if (!strcmp(key, "current")) {
+        strcpy(ctx.cfg.progress.current, value);
+        ctx.cfg.progress.current[sizeof(ctx.cfg.progress.current) - 1] = '\0';
       }
 
-      if (!strcmp(key, "remaining")) {
-        // printf("3key: (%s), with value: (%s)\n", key, value);
-        ctx.cfg.progress.remaining = value[0];
+      else if (!strcmp(key, "remaining")) {
+        strcpy(ctx.cfg.progress.remaining, value);
+        ctx.cfg.progress.remaining[sizeof(ctx.cfg.progress.remaining) - 1] = '\0';
+      }
+
+      else if (!strcmp(key, "color")) {
+
+        if      (!strcmp(value, "red")) strcpy(ctx.cfg.progress.color, RED);
+        else if (!strcmp(value, "cyan")) strcpy(ctx.cfg.progress.color, CYN);
+
+        ctx.cfg.progress.color[sizeof(ctx.cfg.progress.color) - 1] = '\0';
       }
     }
   }
