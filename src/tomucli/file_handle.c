@@ -8,15 +8,19 @@
 
 #include "CLIENT_DATA.h"
 #include "control.h"
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 #include "../shared/shared_control.h"
 
+static const char *filter_fmt[] = {
+    ".mp3", ".opus", ".flac", ".aac", 
+    ".ogg", ".m4a", ".wav", ".wma"  
+};
 
 void queue_free(PlaybackQueue *queue)
 {
   if (!queue->dir.files) return;
 
-  for_each_num(queue->dir.totalFiles) {
+  for_each_num(queue->dir.count) {
     free(queue->dir.files[i]);
   }
 
@@ -25,61 +29,80 @@ void queue_free(PlaybackQueue *queue)
   queue->dir.files = NULL;
 }
 
-// Read all the files in dir and return them 
-void extractDir(const char* path, Dir_File *dir)
+// // Read all the files in dir and return them 
+// void extractDir(const char* path, Dir_File *dir)
+// {
+//
+// clean_files:
+//   closedir(dir_path);
+//   for (int i = 0; i < count_files; i++)
+//       free(files[i]);
+//   free(files);
+//   warn("Not enough memory for files!");
+//   dir->totalFiles = 0;
+//   dir->files = NULL;
+//   die("extractDir:");
+// }
+/*
+ * Check if file extension matches one of the supported audio formats.
+ *
+ * Returns:
+ *   1 -> file is an audio file
+ *   0 -> file is not an audio file
+ */
+int is_audio_fmt(const char *path)
 {
-  int count_files = 0;
-  char **files = NULL;
+  // 1. pointer to '.' from path
+  const char *point = strrchr(path, '.');
+  if (!point) return 0; // if not there '.' skip
 
-  // read dir and extract files
-  struct dirent* file;
-  DIR *dir_path = opendir(path);
-  if (!dir_path) die("Cannot open directory: %s", path);
+  // 2. check from format
 
-  while ((file = readdir(dir_path)) != NULL) { // read each each files from this dir
-      if ((!strcmp(file->d_name, ".")) || (!strcmp(file->d_name, ".."))) continue; // skip ., .. dir
+  // is audio file!
+  for_each_arr(filter_fmt) if (!strcmp(point, filter_fmt[i])) return 1;
 
-      // Grow array if needed
-      if (!(files = realloc(files, sizeof(char*) * (count_files + 1)))) goto clean_files; // add new size malloc
+  // is not audio file!
+  printf("tomucli: is not audio file '%s'\n", path);
+  return 0;
 
-      files[count_files] = strdup(file->d_name); // save this file to array
-      if (!files[count_files]) goto clean_files;
-      count_files++;
-  }
-
-  dir->totalFiles = count_files;
-  dir->files = files;
-  closedir(dir_path);
-  return;
-
-clean_files:
-  closedir(dir_path);
-  for (int i = 0; i < count_files; i++)
-      free(files[i]);
-  free(files);
-  warn("Not enough memory for files!");
-  dir->totalFiles = 0;
-  dir->files = NULL;
-  die("extractDir:");
 }
 
-void path_handle(int server_fd, const char *path, PlaybackQueue *queue)
+void path_handle(const char *path, PlaybackQueue *queue)
 {
-    struct stat st; 
-    if (stat(path, &st) < 0) die("file:");
-    
-    if (S_ISDIR(st.st_mode)) {
-        strncpy(queue->dir.base_path, path, sizeof(queue->dir.base_path) - 1);
-        extractDir(path, &queue->dir);
-        queue->has_queue = 1;  // IMPORTANT: Set this flag
-        queue->current_index = queue->dir.rand_num % queue->dir.totalFiles;
+  usleep(4);
+  struct stat st; 
+  if (stat(path, &st) < 0) {
+    warn("%s", path);
+    return;
+  }
+  
+  // is file
+  if (S_ISREG(st.st_mode)) {
+    if (!ctx.filter_files || is_audio_fmt(path)) {
+      // Allocate space for one more file
+      queue->dir.files = realloc(queue->dir.files, sizeof(char *) * (queue->dir.count + 1));
+      queue->dir.files[queue->dir.count] = strdup(path);
+      queue->dir.count++;
+    }
+  }
 
-    } else if (S_ISREG(st.st_mode)) {
-      send_path(ctx.server_fd, path);
-      // queue->dir.files = malloc(sizeof(char *));
-      // queue->dir.files[0] = strdup(path);
-      // queue->dir.totalFiles = 1;
-      // queue->has_queue = 1;  // Single file mode
+   // is dir
+  else if (S_ISDIR(st.st_mode)) {
+    // read dir and extract files
+    struct dirent* file;
+    DIR *dir_path = opendir(path);
+    if (!dir_path) die("Cannot open directory: %s", path);
 
-    } else die("File:");
+    while ((file = readdir(dir_path)) != NULL) { // read each each files from this dir
+      if ((!strcmp(file->d_name, ".")) || (!strcmp(file->d_name, ".."))) continue; // skip ., .. dir
+
+      // read depth dir
+      char buf[1024];
+      snprintf(buf, sizeof(buf), "%s/%s", path, file->d_name);
+      printf("%s\n", buf);
+      path_handle(buf, queue);
+    }
+
+    closedir(dir_path);
+  } 
 }
