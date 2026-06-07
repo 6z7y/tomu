@@ -1,14 +1,15 @@
 #ifndef CLIENT_DATA_H
 #define CLIENT_DATA_H
 
-#include "../shared/share_utils.h"
+#include "../shared/share_utils1.h"
 
 // Config Structures
 typedef struct {
   int width;
-  char done;
-  char current;
-  char remaining;
+  char done[8];
+  char current[8];
+  char remaining[8];
+  char color[8];
 
 } ProgressBarStyle;
 
@@ -20,10 +21,7 @@ typedef struct {
 
 typedef struct {
   char **files; // array store name files
-  char base_path[1024]; // for dir and random
-  unsigned int rand_num; // for used for get random (% total files)
-  int totalFiles;
-  int currentFile;
+  int count;
 } Dir_File;
 
 // Playback queue state
@@ -39,6 +37,7 @@ typedef struct {
   TomuStatus status;
   PlaybackQueue queue;
   int server_fd;
+  int filter_files;
   int running;
 } Client_CTX;
 
