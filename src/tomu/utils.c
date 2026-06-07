@@ -11,8 +11,8 @@
 void sig_clean(int sig)
 {
   if (ctx.discord_rich_presence) run_command("kill discord_rich_presence");
-  for (int i = 0; i < ctx.queue_count; i++)
-    free(ctx.queue_list[i]);
+  for (int i = 0; i < ctx.list.queue_count; i++)
+    free(ctx.list.queue_list[i]);
 
   cleanUP();
   server_socket_mode(&ctx.server_fd, 0); // socket off
