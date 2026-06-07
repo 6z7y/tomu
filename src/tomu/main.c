@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     int nfds = add_client_into_poll(fds, client); // number clients active now
 
     // 5. start poll mode
-    poll(fds, nfds, 100);
+    poll(fds, nfds, 80);
 
     if (ctx.state.running) {
       broadcast_status(client); // update status when play audio
@@ -61,6 +61,5 @@ int main(int argc, char **argv)
     sleep_ms(100);
   }
 
-bye: 
-  return 0;
+bye: return 0;
 }
