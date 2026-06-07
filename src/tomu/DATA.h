@@ -58,23 +58,27 @@ typedef struct {
 
 } Audio_Info;
 
+typedef struct {
+  char **queue_list; // list
+  int queue_count;   // how many paths in queue
+  int queue_index;   // which one is currently playing
+
+} LIST_FILES;
 
 // struct for point context used in another functions (needed)
 typedef struct PlayBackContext{
+  CLIENTS_SYSTEM client[MAX_CLIENT]; // client handle
   AVFormatContext *fmtCTX; // Structure audio file
   AVCodecContext *codecCTX; // decoder running
   Audio_Buffer *buf;
   TomuStatus state;
   Audio_Info inf; // information audio
-  CLIENTS_SYSTEM client[MAX_CLIENT]; // client handle
-  char *queue_list[200];
+  LIST_FILES list;
   pthread_t playback_thread;
-  int queue_count;   // how many paths in queue
-  int queue_index;   // which one is currently playing
   int playback_active;
+  int discord_rich_presence;
   int server_fd;
   int client_fd;
-  int discord_rich_presence;
 
 } PlayBackContext;
 
