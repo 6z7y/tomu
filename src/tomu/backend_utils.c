@@ -88,6 +88,9 @@ int init_decoder(AVCodecContext *codecCTX, const AVCodecParameters *codecPAR, co
 // reads the file and creates a Stream Context
 int get_audio_info(const char *filename)
 {
+  // extract file name
+  char output[512];
+
   // | Container
   if (avformat_open_input(&ctx.fmtCTX, filename, NULL, NULL) < 0) {
     return warn("ffmpeg: can't read audio file");
@@ -277,58 +280,34 @@ void build_output_path(const char *input, char *out, size_t size) {
     char name_without_ext[256];
     strncpy(name_without_ext, base, sizeof(name_without_ext) - 1);
     name_without_ext[sizeof(name_without_ext) - 1] = '\0';
-
     
     char *dot = strrchr(name_without_ext, '.');
     if (dot) *dot = '\0';
-
-    strcpy(ctx.state.metadata.title, name_without_ext);
-    printf("name: titile : %s\n", ctx.state.metadata.title);
     
     // Build full path: /tmp/tomu_cover_img/filename.jpg
     snprintf(out, size, "/tmp/tomu_cover_img/%s.jpg", name_without_ext);
 }
 
-int make_dir(const char *path) {
-    if (mkdir(path, 0755) == 0) {
-        return 0; // created
-    }
-
-    if (errno == EEXIST) {
-        return 0; // already exists (this is OK)
-    }
-
-    return 1; // error
-}
 
 int get_cover(AVFormatContext *fmt, const char *input) {
-    char output[512];
     
-    // Create directory first
-    make_dir("/tmp/tomu_cover_img");
-    
-    // Build output path (now this actually does something!)
-    build_output_path(input, output, sizeof(output));
+    // 1. Create directory 
+    run_command("/tmp/tomu_cover_img 2> /dev/null");
     
     printf("Looking for cover in: %s\n", input);
-    printf("Will save to: %s\n", output);
-    
-    // Skip if file already exists
-    if (access(output, F_OK) == 0) {
-        printf("Cover already exists, skipping...\n");
-        return 0;
-    }
+    printf("Will save to: %s\n", ctx.state.metadata.title);
     
     // Search for attached picture in streams
     for (unsigned int i = 0; i < fmt->nb_streams; i++) {
         AVStream *stream = fmt->streams[i];
         
+        // Check for attached picture (cover art)
         if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
             AVPacket pkt = stream->attached_pic;
             
-            FILE *f = fopen(output, "wb");
+            FILE *f = fopen(ctx.state.metadata.title, "wb");
             if (!f) {
-                printf("Could not create output file: %s\n", output);
+                printf("Could not create output file: %s\n", ctx.state.metadata.title);
                 return 1;
             }
             
@@ -336,7 +315,7 @@ int get_cover(AVFormatContext *fmt, const char *input) {
             fclose(f);
             
             if (written == pkt.size) {
-                printf("✅ Cover saved: %s (%zu bytes)\n", output, written);
+                printf("✅ Cover saved: %s (%zu bytes)\n", ctx.state.metadata.title, written);
                 return 0;
             } else {
                 printf("⚠️ Cover partially written: %zu/%d bytes\n", written, pkt.size);
@@ -349,12 +328,7 @@ int get_cover(AVFormatContext *fmt, const char *input) {
     return 1;
 }
 
-int extract_cover(const char *input) {
-    if (!input || !ctx.fmtCTX) {
-        printf("No file or format context\n");
-        return 1;
-    }
-    
+int extract_cover(const char *input, AVFormatContext *fmt_ctx) {
     printf("Extracting cover from: %s\n", input);
-    return get_cover(ctx.fmtCTX, input);
+    return get_cover(fmt_ctx, input);
 }

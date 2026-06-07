@@ -24,6 +24,6 @@ void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle);
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played);
 
 void get_metadata();
-int extract_cover(const char *input);
+int extract_cover(const char *input, AVFormatContext *fmt_ctx);
 
 #endif
