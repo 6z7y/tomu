@@ -1,3 +1,24 @@
+# 6z7y 1.3.1_beta - 2026-06-07
+- split shared_utils.{c,h} into shared_utils{1,2}.{c,h}
+  = shared_utils1.{c,h} for important utilities
+  = shared_utils2.{c,h} for normal playback shared logic
+
+* tomu
+  - improve queue system (changed from fixed limit 200 array to fully dynamic memory allocation)
+  - send name file & metadata to all clients before decoder
+
+* tomucli
+  - refactor queue system to dynamic list-based structure
+  - add '-no-filter' option to skip audio filtering
+  - add default audio format filter (can be disabled with -no-filter)
+  - change file scanning flow: scan runs once, extracts all files, then sends them sequentially to server
+  - change key handling from string input to ASCII-based input
+  - fix key handling blocking issue
+  - add '?' key for help / key bindings
+  - upgrade progress config fields (done, current, remaining) from 1 char to 8-byte strings
+  - add config option "color"
+  - add recursive directory file extraction support
+
 # 6z7y 1.3.0_beta - 2026-05-26
 
 - Create ~/.config/tomu directory if not exists (now server/clients settings will be here)
