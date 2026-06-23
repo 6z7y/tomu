@@ -4,7 +4,6 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
-
 #include "share_utils1.h"
 
 // get rand num from linux kernel
@@ -24,7 +23,6 @@ unsigned int get_rand()
   close(fd);
   return n;
 }
-
 
 // build string and return it
 char *format(const char *fmt, ...)
@@ -46,7 +44,6 @@ void run_command(char *cmd)
 
   if (!(p = popen(cmd, "r"))) { 
     warn("cmd:");
-    return;
   }
 
   pclose(p);

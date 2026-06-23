@@ -27,13 +27,15 @@ int match_opt(const char *arg, const char **opts)
 }
 
 // handle command-line arguments
-void args_handle(const char *option)
+int args_handle(const char *option)
 {
   if      (match_opt(option, help_opts)) help();
 
   else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
 
+  else if (is_valid_path(option)) return 0;
+
   else    warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
 
-  exit(0);
+  return 1;
 }

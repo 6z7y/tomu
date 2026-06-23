@@ -12,10 +12,12 @@
 #include "backend_utils.h"
 
 #include "../../libs/miniaudio.h"
+int cou = 0;
 
 // decoder thread
 void *run_decoder(void *arg)
 {
+  printf("hhh\n");
   AVFormatContext *fmtCTX = ctx.fmtCTX;
   AVCodecContext *codecCTX = ctx.codecCTX;
   Audio_Info *inf = &ctx.inf;
@@ -149,6 +151,8 @@ decode:
           output_bytes = frame->nb_samples * inf->ch * inf->sample_fmt_bytes;
           output_data = frame->data[0];
         }
+        printf("i'm here %d\n", cou);;
+        cou++;
         
         // Write to buffer
         if (output_data) {

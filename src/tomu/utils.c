@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "socket_utils.h"
 #include "utils.h"
 
 void sig_clean(int sig)
@@ -15,7 +14,7 @@ void sig_clean(int sig)
     free(ctx.list.queue_list[i]);
 
   cleanUP();
-  server_socket_mode(&ctx.server_fd, 0); // socket off
+  // server_socket_mode(&ctx.server_fd, 0); // socket off
   _exit(0);
 }
 
@@ -23,4 +22,9 @@ void cleanUP(){
 
   if (ctx.fmtCTX)  avformat_close_input(&ctx.fmtCTX);
   if (ctx.codecCTX) avcodec_free_context(&ctx.codecCTX);
+}
+
+
+void init_context()
+{
 }

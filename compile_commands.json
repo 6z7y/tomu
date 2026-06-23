@@ -1,0 +1,78 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/mpris.o",
+      "src/tomu/mpris.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/mpris.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/mpris.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/utils.o",
+      "src/tomu/utils.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/utils.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/utils.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/shared/share_utils1.o",
+      "src/shared/share_utils1.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/shared/share_utils1.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/shared/share_utils1.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/shared/share_utils2.o",
+      "src/shared/share_utils2.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/shared/share_utils2.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/shared/share_utils2.o"
+  }
+]

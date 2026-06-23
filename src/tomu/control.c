@@ -40,6 +40,7 @@ static const KeyMap keymap[] = {
 
 void handle_key(Command cmd, TomuStatus *state)
 {
+  printf("client type %d\n", cmd);
   for (int i = 0; i < (sizeof(keymap) / sizeof(keymap[0])); i++)
     if (cmd == keymap[i].key) keymap[i].handler(state);
 }

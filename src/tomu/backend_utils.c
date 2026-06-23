@@ -191,10 +191,6 @@ void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle)
 {
   state->running = 1;
   state->paused = 0;
-  state->volume = 1.00f;
-  state->speed = 1.00f;
-  state->looping = loop;
-  state->shuffle = shuffle;
 
   state->seek_request = 0;
   state->seek_target = 0;
@@ -241,73 +237,127 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
   return;
 }
 
-void get_metadata()
+// Apply one AVDictionary's tags onto m, but only fields that are still empty.
+// This lets us layer multiple metadata sources (format-level, then per-stream)
+// without a later, emptier source overwriting a value we already found.
+static void apply_metadata_dict(Audio_Metadata *m, AVDictionary *dict)
 {
-  Audio_Metadata *m = &ctx.state.metadata;
-  
-  // Clear arrays (no freeing needed)
-  memset(m, 0, sizeof(*m));
-  
-  AVDictionaryEntry *tag = NULL;
-  while ((tag = av_dict_get(ctx.fmtCTX->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
-    // if (!strcmp(tag->key, "title"))        strncpy(m->title, tag->value, sizeof(m->title) - 1);
-    if (!strcmp(tag->key, "artist"))  strncpy(m->artist, tag->value, sizeof(m->artist) - 1);
-    else if (!strcmp(tag->key, "album"))   strncpy(m->album, tag->value, sizeof(m->album) - 1);
-    else if (!strcmp(tag->key, "album_artist")) strncpy(m->album_artist, tag->value, sizeof(m->album_artist) - 1);
-    else if (!strcmp(tag->key, "genre"))   strncpy(m->genre, tag->value, sizeof(m->genre) - 1);
-    else if (!strcmp(tag->key, "date"))    strncpy(m->date, tag->value, sizeof(m->date) - 1);
-    else if (!strcmp(tag->key, "track"))   strncpy(m->track, tag->value, sizeof(m->track) - 1);
-  }
-  
-  // Ensure null termination
-  // m->title[sizeof(m->title)-1] = '\0';
-  m->artist[sizeof(m->artist)-1] = '\0';
-  m->album[sizeof(m->album)-1] = '\0';
-  m->album_artist[sizeof(m->album_artist)-1] = '\0';
-  m->genre[sizeof(m->genre)-1] = '\0';
-  m->date[sizeof(m->date)-1] = '\0';
-  m->track[sizeof(m->track)-1] = '\0';
+    AVDictionaryEntry *tag = NULL;
+    while ((tag = av_dict_get(dict, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+        if (!strcmp(tag->key, "title")) {
+            if (!m->title[0]) strncpy(m->title, tag->value, sizeof(m->title) - 1);
+        } else if (!strcmp(tag->key, "artist")) {
+            if (!m->artist[0]) strncpy(m->artist, tag->value, sizeof(m->artist) - 1);
+        } else if (!strcmp(tag->key, "album")) {
+            if (!m->album[0]) strncpy(m->album, tag->value, sizeof(m->album) - 1);
+        } else if (!strcmp(tag->key, "album_artist")) {
+            if (!m->album_artist[0]) strncpy(m->album_artist, tag->value, sizeof(m->album_artist) - 1);
+        } else if (!strcmp(tag->key, "genre")) {
+            if (!m->genre[0]) strncpy(m->genre, tag->value, sizeof(m->genre) - 1);
+        } else if (!strcmp(tag->key, "date")) {
+            if (!m->date[0]) strncpy(m->date, tag->value, sizeof(m->date) - 1);
+        } else if (!strcmp(tag->key, "track")) {
+            if (!m->track[0]) strncpy(m->track, tag->value, sizeof(m->track) - 1);
+        }
+    }
+}
+
+void get_metadata(const char *filename)
+{
+    Audio_Metadata *m = &ctx.state.metadata;
+
+    // Clear arrays
+    memset(m, 0, sizeof(*m));
+
+    // 1) Format-level tags (works for MP3/ID3v2, MP4, OGG, etc.)
+    apply_metadata_dict(m, ctx.fmtCTX->metadata);
+
+    // 2) Fallback to the audio stream's own tags. Native FLAC's demuxer
+    //    attaches its VorbisComment block to AVStream->metadata instead of
+    //    AVFormatContext->metadata, so format-level lookup alone comes up
+    //    empty for plain .flac files even though the cover art (which is
+    //    read per-stream) still works fine.
+    int idx = ctx.inf.audioStream_index;
+    if (idx >= 0 && (unsigned)idx < ctx.fmtCTX->nb_streams) {
+        apply_metadata_dict(m, ctx.fmtCTX->streams[idx]->metadata);
+    }
+
+    // 3) Last resort: no title tag found anywhere (untagged file). Use the
+    //    filename (no path, no extension) so Discord/mprisence shows the
+    //    track name instead of falling back to the player name "tomu".
+    if (!m->title[0] && filename) {
+        const char *base = strrchr(filename, '/');
+        base = base ? base + 1 : filename;
+        strncpy(m->title, base, sizeof(m->title) - 1);
+        char *dot = strrchr(m->title, '.');
+        if (dot) *dot = '\0';
+    }
+
+    // Ensure null termination
+    m->title[sizeof(m->title)-1] = '\0';
+    m->artist[sizeof(m->artist)-1] = '\0';
+    m->album[sizeof(m->album)-1] = '\0';
+    m->album_artist[sizeof(m->album_artist)-1] = '\0';
+    m->genre[sizeof(m->genre)-1] = '\0';
+    m->date[sizeof(m->date)-1] = '\0';
+    m->track[sizeof(m->track)-1] = '\0';
 }
 
 ///////////////////////////////////////////////////// about extract cover img
+// Tiny FNV-1a hash so we can key the cover cache off the FULL input path,
+// not just the basename — avoids two different files that happen to share
+// a filename (e.g. "01.flac" in two different album folders) colliding on
+// the same /tmp cache entry and showing each other's stale cover art.
+static unsigned long fnv1a_hash(const char *str) {
+    unsigned long hash = 2166136261UL;
+    while (*str) {
+        hash ^= (unsigned char)(*str++);
+        hash *= 16777619UL;
+    }
+    return hash;
+}
+
 // Helper: extract filename without path and build full output path
 void build_output_path(const char *input, char *out, size_t size) {
-    // Get just the filename from the full path
+    // Get just the filename from the full path (for a readable suffix only)
     const char *base = strrchr(input, '/');
     base = (base) ? base + 1 : input;
-    
-    // Remove extension if present (like .mp3, .flac, etc.)
+
     char name_without_ext[256];
     strncpy(name_without_ext, base, sizeof(name_without_ext) - 1);
     name_without_ext[sizeof(name_without_ext) - 1] = '\0';
-    
+
     char *dot = strrchr(name_without_ext, '.');
     if (dot) *dot = '\0';
-    
-    // Build full path: /tmp/tomu_cover_img/filename.jpg
-    snprintf(out, size, "/tmp/tomu_cover_img/%s.jpg", name_without_ext);
+
+    // Build full path: /tmp/tomu_cover_img/<hash-of-full-path>_<filename>.jpg
+    // The hash of the FULL input path is what guarantees uniqueness; the
+    // filename suffix is just there to make the cache dir human-readable.
+    snprintf(out, size, "/tmp/tomu_cover_img/%lx_%s.jpg", fnv1a_hash(input), name_without_ext);
 }
 
-
 int get_cover(AVFormatContext *fmt, const char *input) {
-    
-    // 1. Create directory 
-    run_command("/tmp/tomu_cover_img 2> /dev/null");
+    // Create directory properly
+    system("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
+
+    // Build output path keyed off the full input path (collision-proof),
+    // see build_output_path() / fnv1a_hash() above for why.
+    char output_path[512];
+    build_output_path(input, output_path, sizeof(output_path));
     
     printf("Looking for cover in: %s\n", input);
-    printf("Will save to: %s\n", ctx.state.metadata.title);
+    printf("Will save to: %s\n", output_path);
     
     // Search for attached picture in streams
     for (unsigned int i = 0; i < fmt->nb_streams; i++) {
         AVStream *stream = fmt->streams[i];
         
-        // Check for attached picture (cover art)
         if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
             AVPacket pkt = stream->attached_pic;
             
-            FILE *f = fopen(ctx.state.metadata.title, "wb");
+            FILE *f = fopen(output_path, "wb");
             if (!f) {
-                printf("Could not create output file: %s\n", ctx.state.metadata.title);
+                printf("Could not create output file: %s\n", output_path);
                 return 1;
             }
             
@@ -315,11 +365,10 @@ int get_cover(AVFormatContext *fmt, const char *input) {
             fclose(f);
             
             if (written == pkt.size) {
-                printf("✅ Cover saved: %s (%zu bytes)\n", ctx.state.metadata.title, written);
+                printf("✅ Cover saved: %s (%zu bytes)\n", output_path, written);
+                // Store cover path in metadata for MPRIS
+                strncpy(ctx.state.metadata.cover_path, output_path, sizeof(ctx.state.metadata.cover_path) - 1);
                 return 0;
-            } else {
-                printf("⚠️ Cover partially written: %zu/%d bytes\n", written, pkt.size);
-                return 1;
             }
         }
     }
@@ -328,6 +377,7 @@ int get_cover(AVFormatContext *fmt, const char *input) {
     return 1;
 }
 
+// Add this to backend_utils.c after get_cover():
 int extract_cover(const char *input, AVFormatContext *fmt_ctx) {
     printf("Extracting cover from: %s\n", input);
     return get_cover(fmt_ctx, input);

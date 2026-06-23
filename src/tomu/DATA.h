@@ -62,6 +62,7 @@ typedef struct {
   char **queue_list; // list
   int queue_count;   // how many paths in queue
   int queue_index;   // which one is currently playing
+  int filter_files;
 
 } LIST_FILES;
 

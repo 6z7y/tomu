@@ -56,7 +56,7 @@ typedef struct {
     char genre[128];          // classification like role or key value
     char date[128];           // releases time
     char track[128];          // track number
-
+    char cover_path[512];  // ADD THIS for cover art path
 } Audio_Metadata;
 
 // struct handle Playback
