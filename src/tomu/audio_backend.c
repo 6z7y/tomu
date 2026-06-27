@@ -14,158 +14,209 @@
 
 #include "../../libs/miniaudio.h"
 
-// WRITE AUDIO DATA TO BUFFER
+static AudioRing *g_ring = &tctx.g_ring;
+
+// Initialize ring buffer with dynamic capacity (in samples, not bytes)
+void audio_ring_init(AudioRing *r, int channels, int sample_rate)
+{
+    int capacity_samples = sample_rate * channels * 1; // 1 second buffer in samples
+    
+    if (r->data) {
+        free(r->data);
+        r->data = NULL;
+    }
+    r->data = malloc(capacity_samples * sizeof(float));
+    r->capacity = capacity_samples;
+    r->write_pos = 0;
+    r->read_pos = 0;
+    r->count = 0;
+    r->channels = channels;
+    r->stopped = 0;
+    pthread_mutex_init(&r->lock, NULL);
+    pthread_cond_init(&r->has_space, NULL);
+    pthread_cond_init(&r->has_data, NULL);
+}
+
+// Resize ring buffer if needed
+void audio_ring_resize(AudioRing *r, int new_capacity_samples)
+{
+    pthread_mutex_lock(&r->lock);
+    
+    if (new_capacity_samples > r->capacity) {
+        float *new_data = malloc(new_capacity_samples * sizeof(float));
+        if (new_data) {
+            // Copy existing data
+            if (r->count > 0) {
+                if (r->read_pos < r->write_pos) {
+                    memcpy(new_data, r->data + r->read_pos, r->count * sizeof(float));
+                } else {
+                    size_t first_part = r->capacity - r->read_pos;
+                    memcpy(new_data, r->data + r->read_pos, first_part * sizeof(float));
+                    memcpy(new_data + first_part, r->data, r->write_pos * sizeof(float));
+                }
+            }
+            free(r->data);
+            r->data = new_data;
+            r->read_pos = 0;
+            r->write_pos = r->count;
+            r->capacity = new_capacity_samples;
+        }
+    }
+    
+    pthread_mutex_unlock(&r->lock);
+}
+
+// Write PCM data to ring buffer (takes float planar, converts to interleaved)
+void audio_ring_write_float(AudioRing *r, float **data, int channels, int nb_samples)
+{
+    if (!data || nb_samples <= 0) return;
+    
+    pthread_mutex_lock(&r->lock);
+    
+    // Wait if buffer is full
+    while (r->count + (nb_samples * channels) > r->capacity && !r->stopped) {
+        pthread_cond_wait(&r->has_space, &r->lock);
+    }
+    
+    if (r->stopped) {
+        pthread_mutex_unlock(&r->lock);
+        return;
+    }
+    
+    // Write interleaved float samples
+    for (int s = 0; s < nb_samples; s++) {
+        for (int ch = 0; ch < channels; ch++) {
+            r->data[r->write_pos] = data[ch][s];
+            r->write_pos = (r->write_pos + 1) % r->capacity;
+            r->count++;
+        }
+    }
+    
+    pthread_cond_broadcast(&r->has_data);
+    pthread_mutex_unlock(&r->lock);
+}
+
+// Read PCM data from ring buffer (reads interleaved float)
+int audio_ring_read_float(AudioRing *r, float *output, int samples_needed)
+{
+    pthread_mutex_lock(&r->lock);
+    
+    while (r->count == 0 && !r->stopped) {
+        pthread_cond_wait(&r->has_data, &r->lock);
+    }
+    
+    if (r->count == 0) {
+        pthread_mutex_unlock(&r->lock);
+        return 0;
+    }
+    
+    int samples_to_read = (samples_needed < r->count) ? samples_needed : r->count;
+    
+    for (int i = 0; i < samples_to_read; i++) {
+        output[i] = r->data[r->read_pos];
+        r->read_pos = (r->read_pos + 1) % r->capacity;
+        r->count--;
+    }
+    
+    pthread_cond_broadcast(&r->has_space);
+    pthread_mutex_unlock(&r->lock);
+    
+    return samples_to_read;
+}
+
+// WRITE AUDIO DATA TO BUFFER - wrapper for float planar
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)
 {
-  pthread_mutex_lock(&buf->lock);
-
-  if (data_must_write <= 0 || data_must_write > buf->capacity) {
-    pthread_mutex_unlock(&buf->lock);
-    return;
-  }
-
-  while (buf->filled + data_must_write > buf->capacity) {
-    pthread_cond_wait(&buf->space_free, &buf->lock);
-  }
-  
-  int space_until_end = buf->capacity - buf->write_pos;
-  
-  if (data_must_write <= space_until_end) {
-    memcpy(buf->pcm_data + buf->write_pos, audio_data, data_must_write);
-  } else {
-    memcpy(buf->pcm_data + buf->write_pos, audio_data, space_until_end);
-    
-    int remaining = data_must_write - space_until_end;
-    memcpy(buf->pcm_data, audio_data + space_until_end, remaining);
-  }
-  
-  buf->write_pos = (buf->write_pos + data_must_write) % buf->capacity;
-  
-  buf->filled += data_must_write;
-  
-  pthread_cond_signal(&buf->data_ready);
-  pthread_mutex_unlock(&buf->lock);
+    // This is now handled directly in decoder
 }
 
 // READ AUDIO DATA FROM BUFFER TO SPEAKER
 void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 {
-  pthread_mutex_lock(&buf->lock);
-  
-  while (buf->filled == 0) {
-    // If decoder is done and buffer is empty → write silence, don't block
-    if (buf->stopped) {
-      memset(output, 0, bytes_needed);
-      pthread_mutex_unlock(&buf->lock);
-      return;
-    }
-    pthread_cond_wait(&buf->data_ready, &buf->lock);
-  }
-  
-  int bytes_to_read = bytes_needed;
-  if (bytes_to_read > buf->filled) {
-    bytes_to_read = buf->filled;
-  }
-  
-  int data_until_end = buf->capacity - buf->read_pos;
-  
-  if (bytes_to_read <= data_until_end) {
-    memcpy(output, buf->pcm_data + buf->read_pos, bytes_to_read);
-  } else {
-    memcpy(output, buf->pcm_data + buf->read_pos, data_until_end);
-    
-    int remaining = bytes_to_read - data_until_end;
-    memcpy(output + data_until_end, buf->pcm_data, remaining);
-  }
-  
-  buf->read_pos = (buf->read_pos + bytes_to_read) % buf->capacity;
-  
-  buf->filled -= bytes_to_read;
-  
-  pthread_cond_signal(&buf->space_free);
-  pthread_mutex_unlock(&buf->lock);
+    // This is now handled directly in ma_dataCallback
 }
 
-// miniaudio will use this callback to read PCM samples
-// this for send raw pcm audio file to speaker (send @!)
+// miniaudio callback - reads float samples directly
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
 {
-  Audio_Info *inf = &ctx.inf;
-  TomuStatus *state = &ctx.state;
+    Audio_Info *inf = &tctx.inf;
+    TomuStatus *state = &tctx.state;
 
-    // Check pause state
     pthread_mutex_lock(&state->lock);
     while (state->paused)
-      pthread_cond_wait(&state->wait_cond, &state->lock);
-      
-    // if (state->running == false) break;
-    // progress(state, current_time, duration_sec);
+        pthread_cond_wait(&state->wait_cond, &state->lock);
     pthread_mutex_unlock(&state->lock);
 
-  
-  int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
-  audio_buffer_read(ctx.buf, output, bytes);
+    int samples_needed = frameCount * inf->ch;
+    float *out = (float*)output;
+    
+    int samples_read = audio_ring_read_float(g_ring, out, samples_needed);
+    
+    // Fill remaining with silence if needed
+    if (samples_read < samples_needed) {
+        memset(out + samples_read, 0, (samples_needed - samples_read) * sizeof(float));
+    }
 
-  // Apply volume
-  pthread_mutex_lock(&state->lock);
-  if (state->volume != 1.00f)
-    ma_apply_volume_factor_pcm_frames(output, frameCount, inf->ma_fmt, inf->ch, state->volume);
-  pthread_mutex_unlock(&state->lock);
+    // Apply volume
+    pthread_mutex_lock(&state->lock);
+    if (state->volume != 1.00f) {
+        for (int i = 0; i < samples_needed; i++) {
+            out[i] *= state->volume;
+        }
+    }
+    pthread_mutex_unlock(&state->lock);
 }
 
-// init miniaudio config before using
-// this for init (the a sender for )
+// init miniaudio config - use FLOAT format
 ma_device_config init_miniaudioConfig(Audio_Info *inf)
 {
-  ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
+    ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
 
-  ma_config.playback.channels = inf->ch;
-  ma_config.playback.format = inf->ma_fmt;
-  ma_config.sampleRate = inf->sample_rate;
-  ma_config.dataCallback = ma_dataCallback;
-  ma_config.pUserData = &ctx;
+    ma_config.playback.channels = inf->ch;
+    ma_config.playback.format = ma_format_f32;  // Always use float!
+    ma_config.sampleRate = inf->sample_rate;
+    ma_config.dataCallback = ma_dataCallback;
+    ma_config.pUserData = &tctx;
 
-  return ma_config;
+    return ma_config;
 }
 
-Audio_Buffer *audio_buffer_init(int capacity)
+Audio_Buffer *audio_buffer_init(int channels, int sample_rate)
 {
-  Audio_Buffer *buf = malloc(sizeof(Audio_Buffer));
-
-  buf->pcm_data = malloc(capacity);
-  buf->capacity = capacity;
-  buf->write_pos = 0;
-  buf->read_pos = 0;
-  buf->filled = 0;
-  buf->stopped = 0;
-
-  pthread_mutex_init(&buf->lock, NULL);
-  pthread_cond_init(&buf->data_ready, NULL);
-  pthread_cond_init(&buf->space_free, NULL);
-  return buf;
+    audio_ring_init(g_ring, channels, sample_rate);
+    Audio_Buffer *buf = malloc(sizeof(Audio_Buffer));
+    memset(buf, 0, sizeof(Audio_Buffer));
+    buf->capacity = sample_rate * channels * 1; // 1 second
+    return buf;
 }
 
-// Reset audio buffer to empty state (used after seeking to discard old audio)
 void audio_buffer_reset()
 {
-  pthread_mutex_lock(&ctx.buf->lock);
-
-    ctx.buf->filled = 0;
-    ctx.buf->read_pos = 0;
-    ctx.buf->write_pos = 0;
-    pthread_cond_broadcast(&ctx.buf->space_free);
-
-  pthread_mutex_unlock(&ctx.buf->lock);
+    pthread_mutex_lock(&g_ring->lock);
+    g_ring->read_pos = 0;
+    g_ring->write_pos = 0;
+    g_ring->count = 0;
+    pthread_cond_broadcast(&g_ring->has_space);
+    pthread_mutex_unlock(&g_ring->lock);
 }
 
 void audio_buffer_destroy(Audio_Buffer *buf)
 {
-  if (buf ){
-    free(buf->pcm_data);
-    pthread_mutex_destroy(&buf->lock);
-    pthread_cond_destroy(&buf->data_ready);
-    pthread_cond_destroy(&buf->space_free);
-    free (ctx.buf);
-  }
+    pthread_mutex_lock(&g_ring->lock);
+    g_ring->stopped = 1;
+    pthread_cond_broadcast(&g_ring->has_data);
+    pthread_cond_broadcast(&g_ring->has_space);
+    pthread_mutex_unlock(&g_ring->lock);
+    
+    if (g_ring->data) {
+        free(g_ring->data);
+        g_ring->data = NULL;
+    }
+    pthread_mutex_destroy(&g_ring->lock);
+    pthread_cond_destroy(&g_ring->has_space);
+    pthread_cond_destroy(&g_ring->has_data);
+    
+    if (buf) {
+        free(buf);
+    }
 }
-

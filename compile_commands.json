@@ -11,12 +11,202 @@
       "-I/usr/include/dbus-1.0",
       "-I/usr/lib64/dbus-1.0/include",
       "-o",
+      "build/tomu/args.o",
+      "src/tomu/args.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/args.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/args.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/audio_backend.o",
+      "src/tomu/audio_backend.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/audio_backend.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/audio_backend.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/backend.o",
+      "src/tomu/backend.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/backend.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/backend.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/backend_utils.o",
+      "src/tomu/backend_utils.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/backend_utils.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/backend_utils.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/config.o",
+      "src/tomu/config.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/config.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/config.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/control.o",
+      "src/tomu/control.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/control.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/control.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/decoder.o",
+      "src/tomu/decoder.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/decoder.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/decoder.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/main.o",
+      "src/tomu/main.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/main.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/main.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/miniaudio.o",
+      "src/tomu/miniaudio.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/miniaudio.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/miniaudio.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
       "build/tomu/mpris.o",
       "src/tomu/mpris.c"
     ],
     "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
     "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/mpris.c",
     "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/mpris.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/cc",
+      "-c",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-O0",
+      "-Iinclude",
+      "-I/usr/include/dbus-1.0",
+      "-I/usr/lib64/dbus-1.0/include",
+      "-o",
+      "build/tomu/streaming.o",
+      "src/tomu/streaming.c"
+    ],
+    "directory": "/home/ee/Documents/Programing/c-lang/project/tomu",
+    "file": "/home/ee/Documents/Programing/c-lang/project/tomu/src/tomu/streaming.c",
+    "output": "/home/ee/Documents/Programing/c-lang/project/tomu/build/tomu/streaming.o"
   },
   {
     "arguments": [

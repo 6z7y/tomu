@@ -12,4 +12,7 @@ void mpris_dispatch(void);
 // (gnome/kde panels, playerctl...) that something changed
 void mpris_notify_change(void);
 
+
+void start_playback(char *path);
+
 #endif

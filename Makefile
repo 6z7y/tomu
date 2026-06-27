@@ -1,7 +1,7 @@
 CC           := cc
 # -O0 (for developer) / -O3 (for final binary)
 CFLAGS       := -Wall -Wextra -g -O0 -Iinclude $(shell pkg-config --cflags dbus-1)
-LIBS         := -lm -lpthread -lavformat -lavcodec -lswresample -lavutil $(shell pkg-config --libs dbus-1)
+LIBS         := -lm -lcurl -lpthread -lavformat -lavcodec -lswresample -lavutil $(shell pkg-config --libs dbus-1)
 INSTALL_PATH := /usr/local/bin
 OBJECT_BUILD_DIR    := build
 

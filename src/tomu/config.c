@@ -55,9 +55,9 @@ void load_config()
     // 7. read line and split
     if (sscanf(line, "%[^:]: '%[^']'", key, value) == 2) {
 
-      if (!strcmp(key, "discord_rich_presence")) {
-        ctx.discord_rich_presence = atoi(value);
-      }
+      // if (!strcmp(key, "discord_rich_presence")) {
+      //   ctx.discord_rich_presence = atoi(value);
+      // }
     }
   }
   fclose(f);

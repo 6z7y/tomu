@@ -25,5 +25,7 @@ void handle_audio_seek(int *duration_time, int64_t *total_samples_played);
 
 void get_metadata(const char *filename);
 int extract_cover(const char *input, AVFormatContext *fmt_ctx);  // ADD THIS
+int extract_cover_from_stream(AVFormatContext *fmt);
+                                                                 //
 
 #endif

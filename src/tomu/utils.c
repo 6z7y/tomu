@@ -6,25 +6,38 @@
 #include <sys/un.h>
 
 #include "utils.h"
+#include "DATA.h"
+#include "streaming.h"
 
 void sig_clean(int sig)
 {
-  if (ctx.discord_rich_presence) run_command("kill discord_rich_presence");
-  for (int i = 0; i < ctx.list.queue_count; i++)
-    free(ctx.list.queue_list[i]);
+  // Clean up streaming if active
+  if (tctx.stream_ctx.is_streaming) {
+    streaming_stop(&tctx);
+  }
+  
+  for (int i = 0; i < tctx.list.queue_count; i++) free(tctx.list.queue_lists[i]);
+  free(tctx.list.queue_lists);
 
   cleanUP();
-  // server_socket_mode(&ctx.server_fd, 0); // socket off
   _exit(0);
 }
 
+
+
 void cleanUP(){
-
-  if (ctx.fmtCTX)  avformat_close_input(&ctx.fmtCTX);
-  if (ctx.codecCTX) avcodec_free_context(&ctx.codecCTX);
-}
-
-
-void init_context()
-{
+  // First, clean up streaming if active
+  if (tctx.stream_ctx.is_streaming) {
+    streaming_cleanup(&tctx);
+  }
+  
+  // Then clean up FFmpeg contexts
+  if (tctx.fmtCTX) {
+    avformat_close_input(&tctx.fmtCTX);
+    tctx.fmtCTX = NULL;
+  }
+  if (tctx.codecCTX) {
+    avcodec_free_context(&tctx.codecCTX);
+    tctx.codecCTX = NULL;
+  }
 }

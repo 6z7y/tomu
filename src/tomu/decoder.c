@@ -10,192 +10,340 @@
 #include "DATA.h"
 #include "audio_backend.h"
 #include "backend_utils.h"
+#include "mpris.h"
+#include "streaming.h"
 
 #include "../../libs/miniaudio.h"
-int cou = 0;
 
-// decoder thread
+// Thread to get audio info without playing
+// Thread to get audio info without playing
+// In get_audio_info_thread, after extracting metadata:
+void *get_audio_info_thread(void *arg)
+{
+    (void)arg;
+    printf("[info_thread] Getting audio info...\n");
+    
+    AVFormatContext *fmtCTX = tctx.fmtCTX;
+    if (!fmtCTX) {
+        fprintf(stderr, "[info_thread] No format context\n");
+        return NULL;
+    }
+
+    if (avformat_find_stream_info(fmtCTX, NULL) < 0) {
+        fprintf(stderr, "[info_thread] Failed to find stream info\n");
+        return NULL;
+    }
+
+    int audioStream_index = -1;
+    for (unsigned int i = 0; i < fmtCTX->nb_streams; i++) {
+        if (fmtCTX->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            audioStream_index = i;
+            break;
+        }
+    }
+
+    if (audioStream_index < 0) {
+        fprintf(stderr, "[info_thread] No audio stream found\n");
+        return NULL;
+    }
+
+    const AVCodecParameters *codecPAR = fmtCTX->streams[audioStream_index]->codecpar;
+    const AVCodec *codecTYPE = avcodec_find_decoder(codecPAR->codec_id);
+    if (!codecTYPE) {
+        fprintf(stderr, "[info_thread] Unsupported codec\n");
+        return NULL;
+    }
+
+    AVCodecContext *codecCTX = avcodec_alloc_context3(codecTYPE);
+    if (!codecCTX) {
+        fprintf(stderr, "[info_thread] Failed to allocate codec context\n");
+        return NULL;
+    }
+
+    avcodec_parameters_to_context(codecCTX, codecPAR);
+    if (avcodec_open2(codecCTX, codecTYPE, NULL) < 0) {
+        fprintf(stderr, "[info_thread] Failed to open codec\n");
+        avcodec_free_context(&codecCTX);
+        return NULL;
+    }
+
+    tctx.codecCTX = codecCTX;
+
+    // Store audio info
+    #ifdef LEGACY_LIBSWRSAMPLE
+        tctx.inf.ch = codecCTX->channels;
+        tctx.inf.ch_layout = codecCTX->channel_layout;
+    #else
+        tctx.inf.ch = codecCTX->ch_layout.nb_channels;
+        tctx.inf.ch_layout = codecCTX->ch_layout;
+    #endif
+
+    tctx.inf.audioStream_index = audioStream_index;
+    tctx.inf.audioStream = fmtCTX->streams[audioStream_index];
+    tctx.inf.sample_rate = codecCTX->sample_rate;
+    tctx.inf.sample_fmt = AV_SAMPLE_FMT_FLT;
+    tctx.inf.sample_fmt_bytes = sizeof(float);
+    tctx.inf.ma_fmt = ma_format_f32;
+
+    int duration_sec = fmtCTX->duration / 1000000;
+    tctx.state.duration = duration_sec;
+
+    printf("[info_thread] Audio info: channels=%d, rate=%d, duration=%d\n",
+           tctx.inf.ch, tctx.inf.sample_rate, duration_sec);
+
+    // Metadata is already extracted in start_playback_thread
+    printf("[info_thread] FINAL METADATA:\n");
+    printf("  Title:  [%s]\n", tctx.state.metadata.title[0] ? tctx.state.metadata.title : "(empty)");
+    printf("  Artist: [%s]\n", tctx.state.metadata.artist[0] ? tctx.state.metadata.artist : "(empty)");
+    printf("  Cover:  [%s]\n", tctx.state.metadata.cover_path[0] ? tctx.state.metadata.cover_path : "(empty)");
+    
+    // Force MPRIS update
+    mpris_notify_change();
+
+    return NULL;
+}
+
+// Main decoder thread - works like the test program
 void *run_decoder(void *arg)
 {
-  printf("hhh\n");
-  AVFormatContext *fmtCTX = ctx.fmtCTX;
-  AVCodecContext *codecCTX = ctx.codecCTX;
-  Audio_Info *inf = &ctx.inf;
-  TomuStatus *state = &ctx.state;
+    (void)arg;
+    printf("[decoder] Thread started\n");
+    AVFormatContext *fmtCTX = tctx.fmtCTX;
+    AVCodecContext *codecCTX = tctx.codecCTX;
+    Audio_Info *inf = &tctx.inf;
+    TomuStatus *state = &tctx.state;
 
-  SwrContext *swrCTX = NULL;        // resampler for sample format changes
-  SwrContext *speed_swrCTX = NULL;  // Separate resampler for playback speed changes
-
-  // Setup format converter (planar->interleaved if needed)
-  if ( av_sample_fmt_is_planar(codecCTX->sample_fmt) ){
-    setup_sample_fmt_resampler(inf, &swrCTX);
-    
-    if (swrCTX) {
-      if ( swr_init(swrCTX) < 0 )
-        swr_free(&swrCTX);
+    if (!codecCTX) {
+        fprintf(stderr, "[decoder] No codec context\n");
+        return NULL;
     }
-  }
 
-  AVPacket *packet = av_packet_alloc();
-  AVFrame *frame = av_frame_alloc();
+    // Resampler to convert any format to float planar (FLTP)
+    SwrContext *swrCTX = NULL;
+    SwrContext *speed_swrCTX = NULL;
 
-  if ( !packet || !frame ) {
-    printf("ERROR: Failed to allocate packet/frame\n");
-    if (swrCTX) swr_free(&swrCTX);
-    if (speed_swrCTX) swr_free(&speed_swrCTX);
-    return NULL;
-  }
+    // Check if we need resampling to FLTP
+    enum AVSampleFormat decoder_fmt = codecCTX->sample_fmt;
+    printf("[decoder] Decoder format: %d, target: FLTP\n", decoder_fmt);
 
-  int64_t total_samples_played = 0;
-  int duration_sec = fmtCTX->duration / 1000000;
-  ctx.state.duration = duration_sec;
-  float last_speed = state->speed;
+    if (decoder_fmt != AV_SAMPLE_FMT_FLTP) {
+        printf("[decoder] Setting up resampler to convert to FLTP\n");
+        
+        #ifdef LEGACY_LIBSWRSAMPLE
+            swrCTX = swr_alloc_set_opts(NULL,
+                codecCTX->channel_layout, AV_SAMPLE_FMT_FLTP, codecCTX->sample_rate,
+                codecCTX->channel_layout, codecCTX->sample_fmt, codecCTX->sample_rate,
+                0, NULL
+            );
+        #else
+            AVChannelLayout out_layout = codecCTX->ch_layout;
+            int ret = swr_alloc_set_opts2(&swrCTX,
+                &out_layout, AV_SAMPLE_FMT_FLTP, codecCTX->sample_rate,
+                &codecCTX->ch_layout, codecCTX->sample_fmt, codecCTX->sample_rate,
+                0, NULL
+            );
+            if (ret < 0) {
+                fprintf(stderr, "[decoder] Failed to set resampler options\n");
+                return NULL;
+            }
+        #endif
+
+        if (swrCTX) {
+            if (swr_init(swrCTX) < 0) {
+                fprintf(stderr, "[decoder] Failed to init resampler\n");
+                swr_free(&swrCTX);
+                swrCTX = NULL;
+            } else {
+                printf("[decoder] Resampler initialized\n");
+            }
+        }
+    } else {
+        printf("[decoder] Already FLTP, no resampler needed\n");
+    }
+
+    AVPacket *packet = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
+
+    if (!packet || !frame) {
+        printf("[decoder] Failed to allocate packet/frame\n");
+        if (swrCTX) swr_free(&swrCTX);
+        if (speed_swrCTX) swr_free(&speed_swrCTX);
+        return NULL;
+    }
+
+    int64_t total_samples_played = 0;
+    int duration_sec = fmtCTX->duration / 1000000;
+    tctx.state.duration = duration_sec;
+    float last_speed = state->speed;
+
+    printf("[decoder] Starting decode loop\n");
 
 decode:
-  while (av_read_frame(fmtCTX, packet) >= 0) {
-
-    // only process audio packets
-    if ( packet->stream_index == inf->audioStream_index ) {
-
-      // send packet to decoder
-      if ( avcodec_send_packet(codecCTX, packet) < 0 ) continue;
-
-      // Receive decoded frame
-      while (avcodec_receive_frame(codecCTX, frame) >= 0) {
-        double current_time = (double)total_samples_played / inf->sample_rate;
-        ctx.state.position = (int)current_time;
-        total_samples_played += frame->nb_samples;
-
-        pthread_mutex_lock(&state->lock);
-          // Handle seek request
-          if (state->seek_request) {
-            handle_audio_seek(&duration_sec, &total_samples_played);
-            av_packet_unref(packet);
-            av_frame_unref(frame);
-            pthread_mutex_unlock(&state->lock);
-            goto decode;
-          }
-        pthread_mutex_unlock(&state->lock);
-        
-        // Handle speed change
-        if (state->speed != last_speed) {
-          last_speed = state->speed;
-          
-          // Free old speed resampler if exists
-          if (speed_swrCTX) {
-            swr_free(&speed_swrCTX);
-            speed_swrCTX = NULL;
-          }
-          
-          // Create new speed resampler if speed ≠ 1.0
-          if (state->speed != 1.0f) {
-            setup_speed_resampler(inf, frame, &speed_swrCTX);
-          }
-        }
-        pthread_mutex_unlock(&state->lock);
-
-
-        // Check pause state
-        pthread_mutex_lock(&state->lock);
-        while (state->paused)
-          pthread_cond_wait(&state->wait_cond, &state->lock);
-          
-        if (state->running == F_ALSE) break;
-        // progress(state, current_time, duration_sec);
-        pthread_mutex_unlock(&state->lock);
-
-        // Process audio based on conversion needs
-        uint8_t *output_data = NULL;
-        int output_bytes = 0;
-        
-        if (speed_swrCTX) {
-          // Speed conversion (with optional format conversion)
-          int out_samples = frame->nb_samples / state->speed;
-          
-          output_bytes = out_samples * inf->ch * inf->sample_fmt_bytes;
-          output_data = malloc(output_bytes);
-          
-          if (output_data) {
-            uint8_t *data_out[1] = {output_data};
-            int samples = swr_convert(speed_swrCTX, data_out, out_samples,
-                                     (const uint8_t**)frame->data, frame->nb_samples);
-            
-            if (samples > 0) {
-              output_bytes = samples * inf->ch * inf->sample_fmt_bytes;
-            } else {
-              free(output_data);
-              output_data = NULL;
+    while (av_read_frame(fmtCTX, packet) >= 0) {
+        if (packet->stream_index == inf->audioStream_index) {
+            if (avcodec_send_packet(codecCTX, packet) < 0) {
+                av_packet_unref(packet);
+                continue;
             }
-          }
-          
-        } else if (swrCTX) {
-          // Format conversion only (planar->interleaved)
-          output_bytes = frame->nb_samples * inf->ch * inf->sample_fmt_bytes;
-          output_data = malloc(output_bytes);
-          
-          if (output_data) {
-            uint8_t *data[1] = {output_data};
-            int samples = swr_convert(swrCTX, data, frame->nb_samples,
-                                     (const uint8_t**)frame->data, frame->nb_samples);
-            
-            if (samples > 0) {
-              output_bytes = samples * inf->ch * inf->sample_fmt_bytes;
-            } else {
-              free(output_data);
-              output_data = NULL;
+
+            while (avcodec_receive_frame(codecCTX, frame) >= 0) {
+                double current_time = (double)total_samples_played / inf->sample_rate;
+                tctx.state.position = (int)current_time;
+                total_samples_played += frame->nb_samples;
+
+                pthread_mutex_lock(&state->lock);
+                if (state->seek_request) {
+                    handle_audio_seek(&duration_sec, &total_samples_played);
+                    av_packet_unref(packet);
+                    av_frame_unref(frame);
+                    pthread_mutex_unlock(&state->lock);
+                    goto decode;
+                }
+                pthread_mutex_unlock(&state->lock);
+
+                if (state->speed != last_speed) {
+                    last_speed = state->speed;
+                    if (speed_swrCTX) {
+                        swr_free(&speed_swrCTX);
+                        speed_swrCTX = NULL;
+                    }
+                    if (state->speed != 1.0f) {
+                        setup_speed_resampler(inf, frame, &speed_swrCTX);
+                    }
+                }
+
+                pthread_mutex_lock(&state->lock);
+                while (state->paused)
+                    pthread_cond_wait(&state->wait_cond, &state->lock);
+                if (state->running == 0) {
+                    pthread_mutex_unlock(&state->lock);
+                    break;
+                }
+                pthread_mutex_unlock(&state->lock);
+
+                // Get float planar data
+                int nb_samples = frame->nb_samples;
+                int channels = inf->ch;
+
+                if (speed_swrCTX) {
+                    // Speed conversion first
+                    int out_samples = frame->nb_samples / state->speed;
+                    if (out_samples <= 0) out_samples = 1;
+                    
+                    // Allocate temp buffer for speed conversion
+                    float **temp_data = malloc(channels * sizeof(float*));
+                    for (int i = 0; i < channels; i++) {
+                        temp_data[i] = malloc(out_samples * sizeof(float));
+                    }
+                    
+                    // Convert speed
+                    int samples = swr_convert(speed_swrCTX, (uint8_t**)temp_data, out_samples,
+                                             (const uint8_t**)frame->data, frame->nb_samples);
+                    
+                    if (samples > 0) {
+                        // Now convert format if needed
+                        if (swrCTX) {
+                            // Need to convert from temp to FLTP
+                            float **final_data = malloc(channels * sizeof(float*));
+                            for (int i = 0; i < channels; i++) {
+                                final_data[i] = malloc(samples * sizeof(float));
+                            }
+                            
+                            int final_samples = swr_convert(swrCTX, (uint8_t**)final_data, samples,
+                                                           (const uint8_t**)temp_data, samples);
+                            
+                            if (final_samples > 0) {
+                                audio_ring_write_float(&tctx.g_ring, final_data, channels, final_samples);
+                            }
+                            
+                            for (int i = 0; i < channels; i++) {
+                                free(final_data[i]);
+                            }
+                            free(final_data);
+                        } else {
+                            // Just use temp data
+                            audio_ring_write_float(&tctx.g_ring, temp_data, channels, samples);
+                        }
+                    }
+                    
+                    for (int i = 0; i < channels; i++) {
+                        free(temp_data[i]);
+                    }
+                    free(temp_data);
+                    
+                } else if (swrCTX) {
+                    // Convert to FLTP
+                    float **float_out = malloc(channels * sizeof(float*));
+                    for (int i = 0; i < channels; i++) {
+                        float_out[i] = malloc(nb_samples * sizeof(float));
+                    }
+                    
+                    int samples = swr_convert(swrCTX, (uint8_t**)float_out, nb_samples,
+                                             (const uint8_t**)frame->data, frame->nb_samples);
+                    
+                    if (samples > 0) {
+                        audio_ring_write_float(&tctx.g_ring, float_out, channels, samples);
+                    }
+                    
+                    for (int i = 0; i < channels; i++) {
+                        free(float_out[i]);
+                    }
+                    free(float_out);
+                    
+                } else {
+                    // Already FLTP - write directly to ring buffer
+                    audio_ring_write_float(&tctx.g_ring, (float**)frame->data, channels, frame->nb_samples);
+                }
+
+                av_frame_unref(frame);
             }
-          }
-          
-        } else {
-          // Direct write (no conversion needed)
-          output_bytes = frame->nb_samples * inf->ch * inf->sample_fmt_bytes;
-          output_data = frame->data[0];
         }
-        printf("i'm here %d\n", cou);;
-        cou++;
+        av_packet_unref(packet);
+
+        if (!state->running) break;
         
-        // Write to buffer
-        if (output_data) {
-          audio_buffer_write(ctx.buf, output_data, output_bytes);
-          
-          // Free if we allocated memory (for speed_swrCTX or swrCTX paths)
-          if (output_data != frame->data[0]) {
-            free(output_data);
-          }
+        // For streaming, check for errors
+        if (tctx.stream_ctx.is_streaming) {
+            StreamBuf *sb = (StreamBuf *)tctx.stream_ctx.stream_buf;
+            pthread_mutex_lock(&sb->lock);
+            int error = sb->error;
+            pthread_mutex_unlock(&sb->lock);
+            
+            if (error) {
+                fprintf(stderr, "[decoder] Streaming error occurred\n");
+                break;
+            }
         }
-        
-        av_frame_unref(frame);
-      }
     }
-    av_packet_unref(packet);
 
+    // Looping only for local files
+    if (!tctx.stream_ctx.is_streaming && state->looping && state->running) {
+        av_seek_frame(fmtCTX, -1, 0, AVSEEK_FLAG_BACKWARD);
+        avcodec_flush_buffers(codecCTX);
+        total_samples_played = 0;
+        goto decode;
+    }
 
-    if (!state->running) break;
-  }
+    // Cleanup
+    pthread_mutex_lock(&state->lock);
+    state->running = 0;
+    pthread_cond_broadcast(&state->wait_cond);
+    pthread_mutex_unlock(&state->lock);
 
-  // Handle looping
-  if (state->looping && state->running) {
-    av_seek_frame(fmtCTX, -1, 0, AVSEEK_FLAG_BACKWARD);
-    avcodec_flush_buffers(codecCTX);
-    total_samples_played = 0;
-    goto decode;
-  }
+    pthread_mutex_lock(&tctx.buf->lock);
+    tctx.buf->stopped = 1;
+    pthread_cond_broadcast(&tctx.buf->data_ready);
+    pthread_mutex_unlock(&tctx.buf->lock);
 
-  // Cleanup
-  pthread_mutex_lock(&state->lock);
-  state->running = 0;
-  pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
+    if (tctx.stream_ctx.is_streaming) {
+        streaming_cleanup(&tctx);
+    }
 
-  // Signal buffer: no more data coming — unblocks ma_dataCallback
-  pthread_mutex_lock(&ctx.buf->lock);
-  ctx.buf->stopped = 1;
-  pthread_cond_broadcast(&ctx.buf->data_ready);
-  pthread_mutex_unlock(&ctx.buf->lock);
-  
-  if (swrCTX) swr_free(&swrCTX);
-  if (speed_swrCTX) swr_free(&speed_swrCTX);
-  av_frame_free(&frame);
-  av_packet_free(&packet);
-  return NULL;
+    if (swrCTX) swr_free(&swrCTX);
+    if (speed_swrCTX) swr_free(&speed_swrCTX);
+    av_frame_free(&frame);
+    av_packet_free(&packet);
+
+    printf("[decoder] Thread finished\n");
+    return NULL;
 }

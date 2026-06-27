@@ -10,71 +10,125 @@
 
 #include "../../libs/miniaudio.h"
 
-#if LIBSWRESAMPLE_VERSION_MAJOR <= 3
-  #define LEGACY_LIBSWRSAMPLE
-#endif
+#include "streaming.h"
 
-// this handles playing audio files.
+static int is_url(const char *path) {
+    return (strncmp(path, "http://", 7) == 0 ||
+            strncmp(path, "https://", 8) == 0);
+}
+
 int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 {
-  printf("have files: %d\n", ctx.list.queue_count);
-  av_log_set_level(AV_LOG_QUIET); // ignore warning
+    printf("have files: %d\n", tctx.list.queue_count);
+    av_log_set_level(AV_LOG_QUIET);
 
-  // 1. Read file audio
-  if (get_audio_info(filename) < 0) return -1;
-  get_metadata(filename); // get metadata
-  extract_cover(filename, ctx.fmtCTX); // extract cover img 
+    int is_streaming = is_url(filename);
+    
+    // First, get audio info from the file or stream
+    if (is_streaming) {
+        if (streaming_init_playback(&tctx, filename) < 0) {
+            fprintf(stderr, "[backend] Failed to initialize streaming\n");
+            // Clean up and return - don't continue
+            cleanUP();
+            return -1;
+        }
+        tctx.inf.audioStream_index = -1;
+        
+        printf("[backend] Getting audio info from stream...\n");
+        
+        pthread_t info_thread;
+        if (pthread_create(&info_thread, NULL, get_audio_info_thread, NULL) != 0) {
+            fprintf(stderr, "[backend] Failed to create info thread\n");
+            cleanUP();
+            return -1;
+        }
+        pthread_join(info_thread, NULL);
+        
+        if (tctx.inf.audioStream_index < 0) {
+            fprintf(stderr, "[backend] Failed to get audio info from stream\n");
+            cleanUP();
+            return -1;
+        }
+        
+        printf("[backend] Stream info: channels=%d, rate=%d\n",
+               tctx.inf.ch, tctx.inf.sample_rate);
+        
+        // Don't call get_metadata here - it will clear what we already have
+        // get_metadata(NULL);
+    } else {
+        if (get_audio_info(filename) < 0) {
+            cleanUP();
+            return -1;
+        }
+        get_metadata(filename);
+        extract_cover(filename, tctx.fmtCTX);
+        
+        printf("[backend] File info: channels=%d, rate=%d\n",
+               tctx.inf.ch, tctx.inf.sample_rate);
+    }
 
-  // Command cmd = CMD_FIRST_INFOS;
-  // char *name_playback = ctx.list.queue_list[ctx.list.queue_index];
-  // uint8_t name_len = strlen(name_playback);
-  // for_each_num(MAX_CLIENT) if (ctx.client[i].active) {
-  //   write(ctx.client[i].fd, &cmd,      sizeof(cmd));
-  //   write(ctx.client[i].fd, &name_len, sizeof(name_len));
-  //   write(ctx.client[i].fd, name_playback, name_len);
-  //   write(ctx.client[i].fd, &ctx.state.metadata, sizeof(ctx.state.metadata));
-  // }
+    // Check if we have valid audio info before proceeding
+    if (tctx.inf.sample_rate == 0 || tctx.inf.ch == 0) {
+        fprintf(stderr, "[backend] Invalid audio format (sample_rate=%d, channels=%d)\n",
+                tctx.inf.sample_rate, tctx.inf.ch);
+        cleanUP();
+        return -1;
+    }
 
-  // 2. Initialize playback status
-  init_playbackstatus(&ctx.state, loop_mode, shuffle_mode);
-  ctx.state.volume = 1.00f;
+    // Initialize playback status
+    init_playbackstatus(&tctx.state, loop_mode, shuffle_mode);
+    tctx.state.volume = 1.00f;
 
-  // initialize a buffer, size = 500ms (Streaming mode)
-  int capacity = (ctx.inf.sample_rate) * (ctx.inf.ch) * (ctx.inf.sample_fmt_bytes) * 0.3;
-  ctx.buf = audio_buffer_init(capacity);
+    // Initialize audio buffer with actual audio info - USE FLOAT!
+    tctx.inf.ma_fmt = ma_format_f32;
+    tctx.inf.sample_fmt = AV_SAMPLE_FMT_FLT;
+    tctx.inf.sample_fmt_bytes = sizeof(float);
+    
+    // Initialize ring buffer with channels and sample rate
+    tctx.buf = audio_buffer_init(tctx.inf.ch, tctx.inf.sample_rate);
+    printf("[backend] Buffer initialized: %d samples (%.2f seconds)\n", 
+           (int)tctx.buf->capacity, (float)tctx.buf->capacity / (tctx.inf.sample_rate * tctx.inf.ch));
 
-  // 3. init miniaudio device
-  ma_device device;
-  ma_device_config ma_config = init_miniaudioConfig(&ctx.inf);
+    // Initialize miniaudio device with FLOAT format
+    ma_device device;
+    ma_device_config ma_config = init_miniaudioConfig(&tctx.inf);
+    
+    printf("[backend] Miniaudio config: %d channels, %d Hz, format=float32\n",
+           tctx.inf.ch, tctx.inf.sample_rate);
 
-  // 4. initialize the device output
-  if (ma_device_init(NULL, &ma_config, &device) != MA_SUCCESS ) goto clean_every;
+    if (ma_device_init(NULL, &ma_config, &device) != MA_SUCCESS) {
+        fprintf(stderr, "[backend] Failed to initialize miniaudio\n");
+        goto clean_every;
+    }
 
-  // 7. start threads
-  pthread_t decoder_thread;
-  pthread_create(&decoder_thread, NULL, run_decoder, NULL);
-  
-  // Start audio playback device
-  ma_device_start(&device);
+    // Start decoder thread
+    pthread_t decoder_thread;
+    if (pthread_create(&decoder_thread, NULL, run_decoder, NULL) != 0) {
+        fprintf(stderr, "[backend] Failed to create decoder thread\n");
+        ma_device_uninit(&device);
+        goto clean_every;
+    }
+    
+    // Start audio playback
+    if (ma_device_start(&device) != MA_SUCCESS) {
+        fprintf(stderr, "[backend] Failed to start audio device\n");
+        ma_device_uninit(&device);
+        goto clean_every;
+    }
+    printf("[backend] Audio playback started\n");
 
-  pthread_join(decoder_thread, NULL);
+    pthread_join(decoder_thread, NULL);
 
 clean_every:
-  // cmd = CMD_END;
-  // for_each_num(MAX_CLIENT) if (ctx.client[i].active) {
-  //   write(ctx.client[i].fd, &cmd, sizeof(cmd));
-  // }
+    tctx.state.running = 0;
 
-  ctx.state.running = 0;
-
-  ma_device_stop(&device);
-  ma_device_uninit(&device);
-  audio_buffer_destroy(ctx.buf);
-  ctx.buf = NULL;
-  pthread_mutex_destroy(&ctx.state.lock);
-  pthread_cond_destroy(&ctx.state.wait_cond);
-  cleanUP();
-  // Zero out per-song state so next song starts clean
-  // memset(&ctx.inf, 0, sizeof(ctx.inf));
-  return 0;
+    ma_device_stop(&device);
+    ma_device_uninit(&device);
+    audio_buffer_destroy(tctx.buf);
+    tctx.buf = NULL;
+    pthread_mutex_destroy(&tctx.state.lock);
+    pthread_cond_destroy(&tctx.state.wait_cond);
+    cleanUP();
+    
+    return 0;
 }

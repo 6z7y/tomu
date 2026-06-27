@@ -6,25 +6,28 @@
 #include <libavutil/avutil.h>
 #include <libswresample/swresample.h>
 #include <pthread.h>
-#include <poll.h>
 #include <stdatomic.h>
+#include "dbus/dbus.h"
 
 #include "../../libs/miniaudio.h"
 #include "../shared/shared_control.h"
-#include "../shared/SHARE_DATA.h"
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
-// socket data
-typedef struct {
-  struct pollfd pfd; // for event if pressed key
-  ClientType type;   // type client (because tui & gui will have cover img later)
-  int fd;            // fd for client
-  int active;        // for make listent the client mode
+#define BUS_NAME    "org.mpris.MediaPlayer2.tomu"
+#define OBJ_PATH    "/org/mpris/MediaPlayer2"
+#define IFACE_ROOT  "org.mpris.MediaPlayer2"
+#define IFACE_PLAYER "org.mpris.MediaPlayer2.Player"
+#define IFACE_PROPS "org.freedesktop.DBus.Properties"
 
-} CLIENTS_SYSTEM;
+// D-Bus data
+typedef struct {
+ DBusConnection *conn;
+ DBusMessage *msg;
+
+} DBus_SYSTEM;
 // -----------------------------
 
 
@@ -59,30 +62,67 @@ typedef struct {
 } Audio_Info;
 
 typedef struct {
-  char **queue_list; // list
+  char **queue_lists; // list
   int queue_count;   // how many paths in queue
   int queue_index;   // which one is currently playing
   int filter_files;
 
 } LIST_FILES;
 
+typedef struct {
+    uint8_t        *data;
+    size_t          size;       /* bytes written by curl so far */
+    size_t          capacity;
+    size_t          read_pos;   /* ffmpeg's current read cursor */
+    int             done;       /* set when curl finishes */
+    int             error;      /* set on HTTP error */
+    pthread_mutex_t lock;
+    pthread_cond_t  more_data;
+} StreamBuf;
+
+typedef struct {
+    char *stream_url;        // resolved direct audio URL
+    char *original_url;      // original user-provided URL
+    int is_streaming;        // 1 if this is a streaming URL
+    int streaming_active;    // 1 if stream is currently active
+    pthread_t stream_thread; // curl download thread
+    StreamBuf *stream_buf;   // buffer for streaming data
+    int stream_done;         // 1 when streaming is complete
+} StreamContext;
+
+
+// Ring buffer for PCM data
+// In DATA.h, update the AudioRing to store float samples like the test program
+typedef struct {
+    float *data;            // Changed to float*
+    size_t write_pos;
+    size_t read_pos;
+    size_t count;           /* samples currently held (not bytes) */
+    size_t capacity;        /* in samples */
+    int channels;
+    pthread_mutex_t lock;
+    pthread_cond_t has_space;
+    pthread_cond_t has_data;
+    int stopped;
+} AudioRing;
+
 // struct for point context used in another functions (needed)
 typedef struct PlayBackContext{
-  CLIENTS_SYSTEM client[MAX_CLIENT]; // client handle
+  DBus_SYSTEM dbus_s;
   AVFormatContext *fmtCTX; // Structure audio file
   AVCodecContext *codecCTX; // decoder running
   Audio_Buffer *buf;
   TomuStatus state;
   Audio_Info inf; // information audio
-  LIST_FILES list;
   pthread_t playback_thread;
+  LIST_FILES list;
   int playback_active;
-  int discord_rich_presence;
-  int server_fd;
-  int client_fd;
+  StreamContext stream_ctx; // ADD THIS
+  AudioRing g_ring;
+
 
 } PlayBackContext;
 
-extern PlayBackContext ctx;
+extern PlayBackContext tctx;
 
 #endif
