@@ -32,12 +32,6 @@ sudo dnf install ffmpeg-devel -y
 sudo pacman -S ffmpeg
 ```
 
-
-#### python libs
-```bash
-pip install pypresence requests --break-system-packages
-```
-
 ## Installation
 
 Clone the project:
@@ -75,17 +69,11 @@ Tomu uses a sophisticated multi-threaded architecture for smooth audio playback:
 
 ![Architecture Diagram](docs/diagram.png)
 
-1. Start the server: `tomu`
-2. Connect with client and play a file: `tomucli /path/to/music`
-3. Control playback with keys from any terminal
+1. Start with play: `tomu /path/to/music`
 
-The client sends commands and receives a live progress bar every second.
-Because the server runs separately, you can disconnect the client and the music keeps playing.
-
-**i made this tool for learn c and need music player less usage ram for i make many session this will take usage ram.**
+**i made this tool for learn c and need music player less usage ram, tomu uses ram 24-30mb.**
 
 `this only beta not complete yet`
 
 Binaries
 - tomu — background server, handles decoding and playback
-- tomucli — client CLI to control the server
