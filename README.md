@@ -1,5 +1,7 @@
 # Tomu
 
+![tomu_icon](./images/tomu_icon.png)
+
 A lightweight audio player for Linux built in C. Tomu focuses on efficient memory usage and audio quality while maintaining a minimal footprint.
 
 ## Features
