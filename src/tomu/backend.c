@@ -11,11 +11,8 @@
 #include "../../libs/miniaudio.h"
 
 #include "streaming.h"
-
-static int is_url(const char *path) {
-    return (strncmp(path, "http://", 7) == 0 ||
-            strncmp(path, "https://", 8) == 0);
-}
+#include "utils1.h"
+#include "utils2.h"
 
 int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
 {
@@ -118,16 +115,30 @@ int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
     printf("[backend] Audio playback started\n");
 
     pthread_join(decoder_thread, NULL);
+    printf("here\n");
 
 clean_every:
     tctx.state.running = 0;
 
+    // 1. Stop the audio device FIRST
     ma_device_stop(&device);
     ma_device_uninit(&device);
-    audio_buffer_destroy(tctx.buf);
-    tctx.buf = NULL;
+    
+    // 2. Wait for any pending callbacks to finish
+    // ma_device_uninit should handle this, but be safe
+    usleep(10000);  // 10ms
+    
+    // 3. NOW destroy the buffer (safe because device is stopped)
+    if (tctx.buf) {
+        audio_buffer_destroy(tctx.buf);
+        tctx.buf = NULL;
+    }
+    
+    // 4. Clean up state mutex/cond
     pthread_mutex_destroy(&tctx.state.lock);
     pthread_cond_destroy(&tctx.state.wait_cond);
+    
+    // 5. Clean up FFmpeg contexts
     cleanUP();
     
     return 0;
