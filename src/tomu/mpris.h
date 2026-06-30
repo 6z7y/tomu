@@ -6,7 +6,6 @@ void mpris_init(void);
 
 // call every loop tick instead of poll() on the old socket fd
 // reads+handles any pending D-Bus calls, never blocks
-void mpris_dispatch(void);
 
 // call instead of broadcast_status() — tells D-Bus listeners
 // (gnome/kde panels, playerctl...) that something changed
@@ -14,5 +13,6 @@ void mpris_notify_change(void);
 
 
 void start_playback(char *path);
+void mpris_loop();
 
 #endif
