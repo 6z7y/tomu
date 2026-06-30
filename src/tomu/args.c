@@ -3,11 +3,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "../shared/SHARE_DATA.h"
-#include "../shared/share_utils1.h"
 #include "DATA.h"
-#include "backend.h"
 #include "mpris.h"
+#include "utils1.h"
+#include "utils2.h"
 
 // arg compare opts
 const char *help_opts[] = {"--help", "help", "-h", NULL};       // help
@@ -37,14 +36,8 @@ int match_opt(const char *arg, const char **opts)
   return 0;
 }
 
-// Check if argument is a URL
-static int is_url(const char *arg) {
-    return (strncmp(arg, "http://", 7) == 0 ||
-            strncmp(arg, "https://", 8) == 0);
-}
-
 // Check if argument is a directory
-static int is_directory(const char *path) {
+int is_directory(const char *path) {
     struct stat st;
     if (stat(path, &st) == 0) {
         return S_ISDIR(st.st_mode);
@@ -64,7 +57,29 @@ static int is_file(const char *path) {
 // handle command-line arguments
 int args_handle(const char *option)
 {
-  if      (match_opt(option, help_opts)) {
+  // if (is_url(option)) {
+  //     // printf("[args] Playing URL: %s\n", option);
+  //     // char *path = strdup(option);
+  //     // start_playback(path);
+  //     // return 0;
+  // }
+  // else if (is_valid_path(option)) {
+  //     printf("[args] Playing file: %s\n", option);
+  //     char *path = strdup(option);
+  //     start_playback(path);
+  //     return 0;
+  // }
+  // else if (is_directory(option)) {
+  //     printf("[args] Directory not yet supported: %s\n", option);
+  //     return 1;
+  // }
+  // else if (is_valid_path(option)) {
+  //     printf("[args] Playing: %s\n", option);
+  //     char *path = strdup(option);
+  //     start_playback(path);
+  //     return 0;
+  // }
+  if (match_opt(option, help_opts)) {
       help();
       return 1;
   }
@@ -72,30 +87,9 @@ int args_handle(const char *option)
       printf("tomu: %s\n", TOMU_VER);
       return 1;
   }
-  else if (is_url(option)) {
-      printf("[args] Playing URL: %s\n", option);
-      char *path = strdup(option);
-      start_playback(path);
-      return 0;
-  }
-  else if (is_file(option)) {
-      printf("[args] Playing file: %s\n", option);
-      char *path = strdup(option);
-      start_playback(path);
-      return 0;
-  }
-  else if (is_directory(option)) {
-      printf("[args] Directory not yet supported: %s\n", option);
-      return 1;
-  }
-  else if (is_valid_path(option)) {
-      printf("[args] Playing: %s\n", option);
-      char *path = strdup(option);
-      start_playback(path);
-      return 0;
-  }
   else {
       warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
-      return 1;
+      // return 1;
   }
+  return 0;
 }
