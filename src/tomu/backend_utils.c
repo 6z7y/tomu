@@ -9,10 +9,9 @@
 #include "../../libs/miniaudio.h"
 #include "audio_backend.h"
 #include "backend.h"
-#include "backend_utils.h"
 
 // function take from planar_value to get interleaved_value
-inline enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
+enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
 {
   switch (value){
     case AV_SAMPLE_FMT_DBLP: return AV_SAMPLE_FMT_DBL;
@@ -63,7 +62,7 @@ void store_information(int audioStream_index, enum AVSampleFormat sample_fmt )
 // function for search audio stream
 int get_audioStream()
 {
-  for_each_num(tctx.fmtCTX->nb_streams) { // loop by number streams
+  for (int i=0; i<tctx.fmtCTX->nb_streams; i++) { // loop by number streams
     AVStream *stream = tctx.fmtCTX->streams[i]; // select index stream between 0..nb_stream
     if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) { // this index is audio stream?
       return i; // (yes) return index
@@ -88,9 +87,6 @@ int init_decoder(AVCodecContext *codecCTX, const AVCodecParameters *codecPAR, co
 // reads the file and creates a Stream Context
 int get_audio_info(const char *filename)
 {
-  // extract file name
-  char output[512];
-
   // | Container
   if (avformat_open_input(&tctx.fmtCTX, filename, NULL, NULL) < 0) {
     return warn("ffmpeg: can't read audio file");
@@ -212,15 +208,25 @@ void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_s
 
 void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle)
 {
-  state->running = 1;
-  state->paused = 0;
-
-  state->seek_request = 0;
-  state->seek_target = 0;
-
-
-  pthread_mutex_init(&state->lock, NULL);
-  pthread_cond_init(&state->wait_cond, NULL);
+    state->running = 1;
+    state->paused = 0;
+    state->seek_request = 0;
+    state->seek_target = 0;
+    state->looping = loop;
+    state->shuffle = shuffle;
+    state->volume = 1.0f;
+    state->speed = 1.0f;
+    state->position = 0;
+    state->duration = 0;
+    state->skip_to_next = 0;
+    
+    // Only initialize if not already initialized
+    // Use a flag or just destroy before re-init
+    // For now, just destroy and re-init
+    pthread_mutex_destroy(&state->lock);
+    pthread_cond_destroy(&state->wait_cond);
+    pthread_mutex_init(&state->lock, NULL);
+    pthread_cond_init(&state->wait_cond, NULL);
 }
 
 void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
