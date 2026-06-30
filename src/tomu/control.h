@@ -2,11 +2,8 @@
 #define CONTROL_H
 
 #include "DATA.h"
-#include "../shared/shared_control.h"
 
-void send_cmd(int sock, Command cmd);
-
-void handle_key(Command cmd, TomuStatus *state);
+// void handle_key(Command cmd, TomuStatus *state);
 
 void playback_toggle(TomuStatus *state);
 void playback_stop(TomuStatus *state);

@@ -9,7 +9,6 @@
 #include "DATA.h"
 #include "backend.h"
 #include "control.h"
-#include "../shared/SHARE_DATA.h"
 
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value);
 
