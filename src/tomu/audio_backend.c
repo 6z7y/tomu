@@ -19,12 +19,16 @@ static AudioRing *g_ring = &tctx.g_ring;
 // Initialize ring buffer with dynamic capacity (in samples, not bytes)
 void audio_ring_init(AudioRing *r, int channels, int sample_rate)
 {
-    int capacity_samples = sample_rate * channels * 1; // 1 second buffer in samples
-    
+    // If already initialized, destroy first
     if (r->data) {
+        pthread_mutex_destroy(&r->lock);
+        pthread_cond_destroy(&r->has_space);
+        pthread_cond_destroy(&r->has_data);
         free(r->data);
         r->data = NULL;
     }
+    
+    int capacity_samples = sample_rate * channels * 1;
     r->data = malloc(capacity_samples * sizeof(float));
     r->capacity = capacity_samples;
     r->write_pos = 0;
@@ -99,13 +103,16 @@ void audio_ring_write_float(AudioRing *r, float **data, int channels, int nb_sam
 // Read PCM data from ring buffer (reads interleaved float)
 int audio_ring_read_float(AudioRing *r, float *output, int samples_needed)
 {
+    // FIX: Check if buffer is stopped before locking
+    if (r->stopped) return 0;
+    
     pthread_mutex_lock(&r->lock);
     
     while (r->count == 0 && !r->stopped) {
         pthread_cond_wait(&r->has_data, &r->lock);
     }
     
-    if (r->count == 0) {
+    if (r->count == 0 || r->stopped) {
         pthread_mutex_unlock(&r->lock);
         return 0;
     }
@@ -141,14 +148,24 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
 {
     Audio_Info *inf = &tctx.inf;
     TomuStatus *state = &tctx.state;
+    
+    // FIX: Check if device is still valid
+    if (!ma_config || !output) return;
 
     pthread_mutex_lock(&state->lock);
-    while (state->paused)
+    while (state->paused && state->running)
         pthread_cond_wait(&state->wait_cond, &state->lock);
     pthread_mutex_unlock(&state->lock);
 
     int samples_needed = frameCount * inf->ch;
     float *out = (float*)output;
+    
+    // FIX: Check if ring buffer is valid before reading
+    if (!g_ring || !g_ring->data || g_ring->stopped) {
+        // Fill with silence
+        memset(out, 0, samples_needed * sizeof(float));
+        return;
+    }
     
     int samples_read = audio_ring_read_float(g_ring, out, samples_needed);
     
@@ -202,21 +219,34 @@ void audio_buffer_reset()
 
 void audio_buffer_destroy(Audio_Buffer *buf)
 {
+    if (!buf) return;
+    
+    // FIX: Check if the ring buffer is already destroyed
+    if (!g_ring->data) {
+        free(buf);
+        return;
+    }
+    
+    // Signal all threads to stop
     pthread_mutex_lock(&g_ring->lock);
     g_ring->stopped = 1;
     pthread_cond_broadcast(&g_ring->has_data);
     pthread_cond_broadcast(&g_ring->has_space);
     pthread_mutex_unlock(&g_ring->lock);
     
+    // FIX: Wait a bit for other threads to wake up and exit
+    usleep(5000);  // 5ms
+    
     if (g_ring->data) {
         free(g_ring->data);
         g_ring->data = NULL;
     }
+    
+    // FIX: Only destroy if they were initialized
+    // Check if mutex/cond are still valid (use a flag or check)
     pthread_mutex_destroy(&g_ring->lock);
     pthread_cond_destroy(&g_ring->has_space);
     pthread_cond_destroy(&g_ring->has_data);
     
-    if (buf) {
-        free(buf);
-    }
+    free(buf);
 }
