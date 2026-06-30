@@ -10,11 +10,8 @@
 #include <time.h>
 
 #include "streaming.h"
-#include "DATA.h"
+#include "structs.h"
 #include "file_handle.h"
-#include "audio_backend.h"
-#include "backend_utils.h"
-#include "mpris.h"
 
 #define DEBUG_STREAMING 1
 

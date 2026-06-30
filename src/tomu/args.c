@@ -1,12 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
-#include "DATA.h"
-#include "mpris.h"
-#include "utils1.h"
-#include "utils2.h"
+#include "macros.h"
+#include "errors.h"
 
 // arg compare opts
 const char *help_opts[] = {"--help", "help", "-h", NULL};       // help
@@ -34,24 +31,6 @@ int match_opt(const char *arg, const char **opts)
       if (!strcmp(arg, opts[i])) return 1;
 
   return 0;
-}
-
-// Check if argument is a directory
-int is_directory(const char *path) {
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        return S_ISDIR(st.st_mode);
-    }
-    return 0;
-}
-
-// Check if argument is a file
-static int is_file(const char *path) {
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        return S_ISREG(st.st_mode);
-    }
-    return 0;
 }
 
 // handle command-line arguments

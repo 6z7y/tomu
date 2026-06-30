@@ -6,11 +6,10 @@
 #include <unistd.h>
 #include <stdarg.h>
 
-#include "DATA.h"
-#include "control.h"
+#include "errors.h"
+#include "structs.h"
+#include "macros.h"
 #include "streaming.h"
-#include "utils1.h"
-#include "utils2.h"
 
 static const char *filter_fmt[] = {
     ".mp3", ".opus", ".flac", ".aac", 

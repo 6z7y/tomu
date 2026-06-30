@@ -1,9 +1,7 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
-#include "DATA.h"
-
-// void handle_key(Command cmd, TomuStatus *state);
+#include "structs.h"
 
 void playback_toggle(TomuStatus *state);
 void playback_stop(TomuStatus *state);

@@ -5,20 +5,22 @@
 #include <stdio.h>
 #include <curl/curl.h>
 
-#include "DATA.h"
+#include "structs.h"
 #include "args.h"
-#include "config.h"
 #include "mpris.h"
-#include "streaming.h"
-#include "utils1.h"
-#include "utils2.h"
+#include "utils.h"
 
 PlayBackContext tctx = {0};
+
+#define IS_URL(arg) (!strncmp(arg, "http://", 7)) || (!strncmp(arg, "https://", 8))
 
 int main(int argc, char **argv)
 {
   signal(SIGINT, sig_clean);
   signal(SIGPIPE, SIG_IGN);
+
+  printf("is url: %d\n", IS_URL(argv[argc-1]));
+  return 0;
 
   first_init();
 

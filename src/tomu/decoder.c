@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "DATA.h"
+#include "structs.h"
 #include "audio_backend.h"
 #include "backend_utils.h"
 #include "mpris.h"

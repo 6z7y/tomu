@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "DATA.h"
-#include "utils1.h"
+#include "errors.h"
+#include "utils.h"
 
 #define SIZE_BUF 64
 

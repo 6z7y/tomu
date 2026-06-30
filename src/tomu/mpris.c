@@ -5,13 +5,15 @@
 #include <signal.h>
 #include <ctype.h>
 #include <dbus/dbus.h>
+#include <stdarg.h>
+#include <unistd.h>
 
 #include "mpris.h"
-#include "backend.h"
-#include "DATA.h"
+#include "errors.h"
+#include "macros.h"
+#include "structs.h"
 #include "control.h"
 #include "file_handle.h"
-#include "streaming.h"
 
 void mpris_init(void) {
     DBusError err;

@@ -1,20 +1,16 @@
 #include <pthread.h>
 #include <unistd.h>
-#include <string.h>
 
-#include "DATA.h"
+#include "../../libs/miniaudio.h"
 #include "audio_backend.h"
 #include "backend.h"
 #include "backend_utils.h"
 #include "decoder.h"
-
-#include "../../libs/miniaudio.h"
-
 #include "streaming.h"
-#include "utils1.h"
-#include "utils2.h"
+#include "utils.h"
 
-int playback_run(const char *filename, uint loop_mode, uint shuffle_mode)
+
+int playback_run(const char *filename, int loop_mode, int shuffle_mode)
 {
     printf("have files: %d\n", tctx.list.queue_count);
     av_log_set_level(AV_LOG_QUIET);

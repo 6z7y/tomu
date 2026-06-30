@@ -1,44 +1,8 @@
-#include <sys/poll.h>
-#include <termios.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <pthread.h>
-#include <poll.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 
+#include "macros.h"
 #include "control.h"
-
-
-// static const KeyMap keymap[] = {
-// //        KEY                     EXEC
-//     { CMD_PLAY_TOGGLE,      playback_toggle         },
-//     { CMD_STOP,             playback_stop           },
-//     { CMD_NEXT_AUDIO,       playback_next_audio     },
-//     { CMD_PREV_AUDIO,       playback_prev_audio     },
-//     { CMD_VOL_UP,           volume_increase         },
-//     { CMD_VOL_DOWN,         volume_decrease         },
-//     { CMD_SPEED_FAST,       playback_speed_increase },
-//     { CMD_SPEED_SLOW,       playback_speed_decrease },
-//     { CMD_SPEED_DEFAULT,    playback_speed_defualt  },
-//     { CMD_SEEK_FORWARD_5S,  seek_forward_sec        },
-//     { CMD_SEEK_BACKWARD_5S, seek_backward_sec       },
-//     { CMD_SEEK_FORWARD_1M,  seek_forward_min        },
-//     { CMD_SEEK_BACKWARD_1M, seek_backward_min       },
-//     { CMD_LOOP_TOGGLE,      loop_toggle             },
-//     { CMD_SHUFFLE_TOGGLE,   shuffle_toggle          },
-// };
-
-// send msg command to all client
-// void send_cmd(int sock, Command cmd)
-// { write(sock, &cmd, sizeof(Command)); }
-
-// void handle_key(Command cmd, TomuStatus *state)
-// {
-//   printf("client type %d\n", cmd);
-//   for (int i = 0; i < (sizeof(keymap) / sizeof(keymap[0])); i++)
-//     if (cmd == keymap[i].key) keymap[i].handler(state);
-// }
 
 // control playback (stop/resume/stop)
 // functions for playback

@@ -1,7 +1,7 @@
 #ifndef AUDIO_BACKEND_H
 #define AUDIO_BACKEND_H
 
-#include "DATA.h"
+#include "structs.h"
 #include "../../libs/miniaudio.h"
 
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write);

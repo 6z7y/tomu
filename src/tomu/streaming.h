@@ -4,7 +4,7 @@
 #include <curl/curl.h>
 #include <libavformat/avformat.h>
 
-#include "DATA.h"
+#include "structs.h"
 
 // Initialize streaming context
 int streaming_init(PlayBackContext *ctx);

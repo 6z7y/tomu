@@ -1,14 +1,13 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
-#include <dirent.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "../../libs/miniaudio.h"
 #include "audio_backend.h"
-#include "backend.h"
+#include "errors.h"
+#include "structs.h"
 
 // function take from planar_value to get interleaved_value
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
@@ -206,7 +205,7 @@ void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_s
   }
 }
 
-void init_playbackstatus(TomuStatus *state, uint loop, uint shuffle)
+void init_playbackstatus(TomuStatus *state, int loop, int shuffle)
 {
     state->running = 1;
     state->paused = 0;
