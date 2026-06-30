@@ -11,6 +11,7 @@
 
 #include "streaming.h"
 #include "DATA.h"
+#include "file_handle.h"
 #include "audio_backend.h"
 #include "backend_utils.h"
 #include "mpris.h"
@@ -163,6 +164,56 @@ static void *curl_thread_fn(void *arg) {
     curl_easy_cleanup(curl);
     free(ca);
     return NULL;
+}
+
+
+/*
+ * Detect if a URL is a YouTube playlist.
+ * Returns 1 if it contains "list=" and is not a single video (&v= without list context).
+ */
+static int is_playlist_url(const char *url)
+{
+    return strstr(url, "list=") != NULL;
+}
+
+/*
+ * Expand a playlist URL into the queue.
+ * Calls yt-dlp to get all audio URLs and adds each one via queue_add().
+ * Returns number of entries added, -1 on error.
+ */
+int resolve_playlist(const char *url)
+{
+    printf("[playlist] Expanding: %s\n", url);
+
+    char cmd[4096];
+    snprintf(cmd, sizeof(cmd),
+        "yt-dlp --flat-playlist --print url \"%s\" 2>/dev/null",
+        url);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        fprintf(stderr, "[playlist] popen failed\n");
+        return -1;
+    }
+
+    int count = 0;
+    char line[8192];
+    while (fgets(line, sizeof(line), fp)) {
+        // strip newline
+        size_t len = strlen(line);
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
+            line[--len] = '\0';
+
+        if (len == 0) continue;
+
+        printf("[playlist] +%d: %s\n", count + 1, line);
+        queue_add(line);
+        count++;
+    }
+    pclose(fp);
+
+    printf("[playlist] Added %d tracks\n", count);
+    return count;
 }
 
 // Resolve URL using yt-dlp
@@ -353,75 +404,7 @@ void download_thumbnail(const char *url) {
         return;
     }
     
-    // Create directory
-    system("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
-    
-    char output_path[512];
-    char clean_title[256] = {0};
-    
-    // CRITICAL: Use the title from metadata
-    if (strlen(tctx.state.metadata.title) > 0) {
-        strncpy(clean_title, tctx.state.metadata.title, sizeof(clean_title) - 1);
-        sanitize_filename(clean_title);
-        // Replace spaces with underscores
-        for (int i = 0; clean_title[i]; i++) {
-            if (clean_title[i] == ' ') clean_title[i] = '_';
-        }
-        snprintf(output_path, sizeof(output_path), "/tmp/tomu_cover_img/%s.jpg", clean_title);
-        printf("[thumbnail] Using title: '%s' -> '%s'\n", tctx.state.metadata.title, output_path);
-    } else {
-        // Fallback to timestamp
-        time_t now = time(NULL);
-        snprintf(output_path, sizeof(output_path), "/tmp/tomu_cover_img/cover_%ld.jpg", now);
-        printf("[thumbnail] No title, using fallback: %s\n", output_path);
-    }
-    
-    printf("[thumbnail] Downloading: %s\n", url);
-    printf("[thumbnail] Saving to: %s\n", output_path);
-    
-    CURL *curl = curl_easy_init();
-    if (!curl) {
-        fprintf(stderr, "[thumbnail] Failed to init curl\n");
-        return;
-    }
-    
-    FILE *file = fopen(output_path, "wb");
-    if (!file) {
-        fprintf(stderr, "[thumbnail] Failed to open file\n");
-        curl_easy_cleanup(curl);
-        return;
-    }
-    
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT,
-                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    
-    CURLcode res = curl_easy_perform(curl);
-    fclose(file);
-    
-    if (res == CURLE_OK) {
-        struct stat st;
-        if (stat(output_path, &st) == 0 && st.st_size > 100) {
-            printf("[thumbnail] ✅ Downloaded: %s (%ld bytes)\n", output_path, st.st_size);
-            // Store the cover path in metadata
-            strncpy(tctx.state.metadata.cover_path, output_path, sizeof(tctx.state.metadata.cover_path) - 1);
-            printf("[thumbnail] Cover path stored: %s\n", tctx.state.metadata.cover_path);
-        } else {
-            fprintf(stderr, "[thumbnail] ⚠️ File too small or empty\n");
-            unlink(output_path);
-        }
-    } else {
-        fprintf(stderr, "[thumbnail] ❌ Download failed: %s\n", curl_easy_strerror(res));
-        unlink(output_path);
-    }
-    
-    curl_easy_cleanup(curl);
+    strncpy(tctx.state.metadata.cover_path, url, sizeof(tctx.state.metadata.cover_path) - 1);
 }
 
 // Initialize streaming context

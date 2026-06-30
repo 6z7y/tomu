@@ -11,6 +11,7 @@ int streaming_init(PlayBackContext *ctx);
 
 // Resolve URL using yt-dlp
 char *resolve_url(const char *url);
+int resolve_playlist(const char *url);
 
 // Start streaming from URL
 int streaming_start(PlayBackContext *ctx, const char *url);
