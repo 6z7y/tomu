@@ -1,4 +1,12 @@
-# 6z7y 1.3.3-beta - 2026-06-23
+# 6z7y 1.3.4-beta - 2026-06-30
+- Return path handle from playback system
+- Add playlist URL support
+- Fix crash after URL playback
+- Remove `src/shared/`
+- Improve threading and stream management
+- Improve shutdown safety in audio backend
+
+# 6z7y 1.3.3-beta - 2026-06-27
 - change context ctx to tctx
 - add libcurl dependency for stream URL support
 
