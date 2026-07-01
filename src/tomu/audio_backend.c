@@ -131,17 +131,6 @@ int audio_ring_read_float(AudioRing *r, float *output, int samples_needed)
     return samples_to_read;
 }
 
-// WRITE AUDIO DATA TO BUFFER - wrapper for float planar
-void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)
-{
-    // This is now handled directly in decoder
-}
-
-// READ AUDIO DATA FROM BUFFER TO SPEAKER
-void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
-{
-    // This is now handled directly in ma_dataCallback
-}
 
 // miniaudio callback - reads float samples directly
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
@@ -190,7 +179,7 @@ ma_device_config init_miniaudioConfig(Audio_Info *inf)
     ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
 
     ma_config.playback.channels = inf->ch;
-    ma_config.playback.format = ma_format_f32;  // Always use float!
+    ma_config.playback.format = inf->ma_fmt;
     ma_config.sampleRate = inf->sample_rate;
     ma_config.dataCallback = ma_dataCallback;
     ma_config.pUserData = &tctx;
