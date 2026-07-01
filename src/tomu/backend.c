@@ -6,6 +6,7 @@
 #include "backend.h"
 #include "backend_utils.h"
 #include "decoder.h"
+#include "macros.h"
 #include "streaming.h"
 #include "utils.h"
 
@@ -15,7 +16,7 @@ int playback_run(const char *filename, int loop_mode, int shuffle_mode)
     printf("have files: %d\n", tctx.list.queue_count);
     av_log_set_level(AV_LOG_QUIET);
 
-    int is_streaming = is_url(filename);
+    int is_streaming = IS_URL(filename);
     
     // First, get audio info from the file or stream
     if (is_streaming) {
@@ -54,7 +55,7 @@ int playback_run(const char *filename, int loop_mode, int shuffle_mode)
             return -1;
         }
         get_metadata(filename);
-        extract_cover(filename, tctx.fmtCTX);
+        extract_cover(filename);
         
         printf("[backend] File info: channels=%d, rate=%d\n",
                tctx.inf.ch, tctx.inf.sample_rate);
