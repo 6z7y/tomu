@@ -24,7 +24,6 @@ $(TOMU_BUILD_DIR)/%.o: $(TOMU_DIR)/%.c
 
 # install
 install: all
-	mkdir -p $(HOME)/.config/tomu
 	@echo "\033[0;33mrequesting root permission, for install tomu\033[0m"
 	sudo install -m755 $(TOMU_NAME) $(INSTALL_PATH)
 	@echo "\033[0;32mDone\033[0m"
