@@ -26,14 +26,14 @@ typedef struct {
 // -----------------------------
 
 typedef struct {
-    char title[128];          // song name
+    char title[256];          // song name
     char artist[128];         // who made the song
     char album[128];          // album name
     char album_artist[128];   // album owner
     char genre[128];          // classification like role or key value
     char date[128];           // releases time
     char track[128];          // track number
-    char cover_path[512];  // ADD THIS for cover art path
+    char cover_path[512];  // for cover art path
     char url[256];
 } Audio_Metadata;
 
