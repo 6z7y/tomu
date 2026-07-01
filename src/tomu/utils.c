@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "macros.h"
 #include "structs.h"
 #include "audio_backend.h"
 #include "backend.h"
@@ -27,37 +28,6 @@ char *format(const char *fmt, ...)
 
   return buf;
 }
-
-void cleanUP(){
-  // First, clean up streaming if active
-  if (tctx.stream_ctx.is_streaming) {
-    streaming_cleanup(&tctx);
-  }
-  
-  // Then clean up FFmpeg contexts
-  if (tctx.fmtCTX) {
-    avformat_close_input(&tctx.fmtCTX);
-    tctx.fmtCTX = NULL;
-  }
-  if (tctx.codecCTX) {
-    avcodec_free_context(&tctx.codecCTX);
-    tctx.codecCTX = NULL;
-  }
-}
-
-void sig_clean(int sig)
-{
-  // Clean up streaming if active
-  if (tctx.stream_ctx.is_streaming) {
-    streaming_stop(&tctx);
-  }
-  for (int i = 0; i < tctx.list.queue_count; i++) free(tctx.list.queue_lists[i]);
-  free(tctx.list.queue_lists);
-
-  cleanUP();
-  _exit(0);
-}
-
 
 // get rand num from linux kernel
 unsigned int get_rand()
@@ -90,6 +60,36 @@ void run_command(char *cmd)
   pclose(p);
 }
 
+// clean playback ctx
+void cleanUP(){
+  // First, clean up streaming if active
+  if (tctx.stream_ctx.is_streaming) {
+    streaming_cleanup(&tctx);
+  }
+  
+  // Then clean up FFmpeg contexts
+  if (tctx.fmtCTX) {
+    avformat_close_input(&tctx.fmtCTX);
+    tctx.fmtCTX = NULL;
+  }
+  if (tctx.codecCTX) {
+    avcodec_free_context(&tctx.codecCTX);
+    tctx.codecCTX = NULL;
+  }
+}
+
+void sig_clean(int sig)
+{
+  // Clean up streaming if active
+  if (tctx.stream_ctx.is_streaming) {
+    streaming_stop(&tctx);
+  }
+  for (int i = 0; i < tctx.list.queue_count; i++) free(tctx.list.queue_lists[i]);
+  free(tctx.list.queue_lists);
+
+  cleanUP();
+  _exit(0);
+}
 
 void *playback_queue_thread(void *arg) {
     (void)arg;
@@ -158,17 +158,27 @@ void *playback_queue_thread(void *arg) {
     return NULL;
 }
 
-// Check if argument is a URL
-int is_url(const char *arg)
-{
-  return (!strncmp(arg, "http://", 7)) || (!strncmp(arg, "https://", 8));
-}
+// init mpris connection
+void mpris_init(void) {
+  DBusError err;
+  dbus_error_init(&err);
 
+  // 1. connect to dbus session
+  tctx.dbus_s.conn = dbus_bus_get(DBUS_BUS_SESSION, &err);
+  dbus_err_handle(&err, format("dbus connect failed: %s\n", &err.message));
+
+  // 2. change name dbus session for support mpris
+  int ret = dbus_bus_request_name(tctx.dbus_s.conn, BUS_NAME, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
+  dbus_err_handle(&err, format("dbus name request failed: %s\n", err.message));
+
+  if (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) die("tomu: already running\n");
+}
 
 void first_init()
 {
     curl_global_init(CURL_GLOBAL_ALL);
     mpris_init();
+    tctx.list.filter_files = 1;
 
     pthread_mutex_init(&tctx.list.lock, NULL);
     pthread_cond_init(&tctx.list.item_ready, NULL);

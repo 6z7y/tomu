@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <dbus/dbus.h>
 #include <stdarg.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "mpris.h"
@@ -14,29 +15,9 @@
 #include "structs.h"
 #include "control.h"
 #include "file_handle.h"
+#include "utils.h"
 
-void mpris_init(void) {
-    DBusError err;
-    dbus_error_init(&err);
-
-    tctx.dbus_s.conn = dbus_bus_get(DBUS_BUS_SESSION, &err);
-    if (dbus_error_is_set(&err)) {
-        fprintf(stderr, "tomu: dbus connect failed: %s\n", err.message);
-        dbus_error_free(&err); exit(1);
-    }
-
-    int ret = dbus_bus_request_name(tctx.dbus_s.conn, BUS_NAME, DBUS_NAME_FLAG_REPLACE_EXISTING, &err);
-    if (dbus_error_is_set(&err)) {
-        fprintf(stderr, "tomu: dbus name request failed: %s\n", err.message);
-        dbus_error_free(&err); exit(1);
-    }
-    if (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-        fprintf(stderr, "tomu: already running\n");
-        exit(1);
-    }
-
-    printf("tomu mpris ready: %s\n", BUS_NAME);
-}
+DBusError *err = &tctx.dbus_s.err;
 
 /* URL decode a string in-place */
 static void url_decode(char *str) {
@@ -142,8 +123,9 @@ static void append_metadata(DBusMessageIter *var) {
     DBusMessageIter arr;
     dbus_message_iter_open_container(var, DBUS_TYPE_ARRAY, "{sv}", &arr);
 
-
-    const char *title = tctx.state.metadata.title[0] ? tctx.state.metadata.title : "Unknown Track";
+    // length
+    if (tctx.state.duration > 0) 
+      dict_add_int64(&arr, "mpris:length", (int64_t)tctx.state.duration * 1000000);
 
     // Artust
     if (tctx.state.metadata.artist[0])
@@ -153,34 +135,36 @@ static void append_metadata(DBusMessageIter *var) {
     if (tctx.state.metadata.cover_path[0])
       dict_add_string(&arr, "mpris:artUrl", tctx.state.metadata.cover_path);
 
+    // track
+    if (strlen(tctx.state.metadata.track) > 0)
+        dict_add_int32(&arr, "xesam:trackNumber", (int32_t)atoi(tctx.state.metadata.track));
+
     // trackid
-    if (tctx.state.metadata.track[0])
-        // dict_add_path(&arr, "mpris:trackid", "/org/mpris/MediaPlayer2/tomu/track1");
-        dict_add_path(&arr, "mpris:trackid", "\0");
-        // dict_add_int32(&arr, "mpris:trackNumber", (int32_t)atoi(tctx.state.metadata.track));
+    dict_add_path(&arr, "mpris:trackid", "/org/mpris/MediaPlayer2/tomu/track1");
 
     // title
     if (tctx.state.metadata.title[0])
-      dict_add_string(&arr, "xesam:title", title);
+      dict_add_string(&arr, "xesam:title", tctx.state.metadata.title);
 
     // url
     if (tctx.state.metadata.url[0])
       dict_add_string(&arr, "xesam:url", tctx.state.metadata.url);
 
-    // length
-    dict_add_int64(&arr, "mpris:length", (int64_t)tctx.state.duration * 1000000);
-
+    // data
+    if (tctx.state.metadata.date[0])
       dict_add_string(&arr, "xesam:contentCreated", tctx.state.metadata.date);
 
-    // if (tctx.state.metadata.album_artist[0])
-    //   dict_add_strarray1(&arr, "xesam:albumArtist", tctx.state.metadata.album_artist);
+    // album artist
+    if (tctx.state.metadata.album_artist[0])
+      dict_add_strarray1(&arr, "xesam:albumArtist", tctx.state.metadata.album_artist);
 
-    // if (tctx.state.metadata.album[0])
-    //     dict_add_string(&arr, "xesam:album", tctx.state.metadata.album);
-    // if (tctx.state.metadata.genre[0])
-    //     dict_add_strarray1(&arr, "xesam:genre", tctx.state.metadata.genre);
-    // if (tctx.state.metadata.track[0])
-    //     dict_add_int32(&arr, "xesam:trackNumber", (int32_t)atoi(tctx.state.metadata.track));
+    // album name
+    if (tctx.state.metadata.album[0])
+        dict_add_string(&arr, "xesam:album", tctx.state.metadata.album);
+
+    // genre
+    if (tctx.state.metadata.genre[0])
+        dict_add_strarray1(&arr, "xesam:genre", tctx.state.metadata.genre);
 
     dbus_message_iter_close_container(var, &arr);
 }
@@ -188,7 +172,7 @@ static void append_metadata(DBusMessageIter *var) {
 /* ---------- append_property / reply_get / reply_get_all ---------------- */
 static void append_property(DBusMessageIter *target, const char *iface, const char *prop) {
     (void)iface;
-    if      (!strcmp(prop, "PlaybackStatus"))
+    if (!strcmp(prop, "PlaybackStatus"))
         var_string(target, tctx.state.paused ? "Paused" : (tctx.state.running ? "Playing" : "Stopped"));
     else if (!strcmp(prop, "LoopStatus"))
         var_string(target, tctx.state.looping ? "Playlist" : "None");
@@ -303,7 +287,6 @@ static void reply_empty(DBusMessage *msg) {
     dbus_message_unref(reply);
 }
 
-/* ---------- Message dispatcher ----------------------------------------- */
 static void handle_message(DBusMessage *msg) {
     if (dbus_message_is_method_call(msg, IFACE_PROPS, "Get")) {
         const char *iface, *prop;
@@ -375,9 +358,8 @@ static void handle_message(DBusMessage *msg) {
     }
     else if (dbus_message_is_method_call(msg, IFACE_PLAYER, "OpenUri")) {
         const char *uri;
-        DBusError err;
-        dbus_error_init(&err);
-        if (dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &uri, DBUS_TYPE_INVALID)) {
+        dbus_error_init(err);
+        if (dbus_message_get_args(msg, err, DBUS_TYPE_STRING, &uri, DBUS_TYPE_INVALID)) {
             reply_empty(msg);
             strcpy(tctx.state.metadata.url, uri);
             const char *path = uri;
@@ -394,7 +376,7 @@ static void handle_message(DBusMessage *msg) {
                 "org.freedesktop.DBus.Error.InvalidArgs", "Invalid URI argument");
             dbus_connection_send(tctx.dbus_s.conn, error, NULL);
             dbus_message_unref(error);
-            dbus_error_free(&err);
+            dbus_error_free(err);
         }
     }
     else if (dbus_message_is_method_call(msg, IFACE_ROOT, "Raise")) {
@@ -406,28 +388,34 @@ static void handle_message(DBusMessage *msg) {
     }
 }
 
-/* ---------- Public API ------------------------------------------------- */
+// read from dbus incoming msg
 void mpris_dispatch(void) {
     if (!tctx.dbus_s.conn) die("dbus:");
-    dbus_connection_read_write(tctx.dbus_s.conn, 0);
+    dbus_connection_read_write(tctx.dbus_s.conn, 0); // read incoming msg from dbus 
+
+    // Process each received msg
     while ((tctx.dbus_s.msg = dbus_connection_pop_message(tctx.dbus_s.conn)) != NULL) {
         handle_message(tctx.dbus_s.msg);
         dbus_message_unref(tctx.dbus_s.msg);
     }
 }
 
+// broadcast update properties
 void mpris_notify_change(void) {
-    if (!tctx.dbus_s.conn) return;
+    if (!tctx.dbus_s.conn) die("dbus:");
 
+    // create dbus signal
     DBusMessage *signal = dbus_message_new_signal(OBJ_PATH, IFACE_PROPS, "PropertiesChanged");
     if (!signal) return;
 
     DBusMessageIter iter, changed, invalid;
-    dbus_message_iter_init_append(signal, &iter);
+    dbus_message_iter_init_append(signal, &iter); // start write data into msg
 
+    // the changed properties belong to to org.mpris.MediaPlayer2.player
     const char *iface = IFACE_PLAYER;
     dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &iface);
 
+    // start the dictionary of changed properties
     dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "{sv}", &changed);
 
     const char *push[] = { "PlaybackStatus", "Metadata", "Volume", "Position", NULL };
