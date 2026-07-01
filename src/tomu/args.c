@@ -2,8 +2,11 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "macros.h"
 #include "errors.h"
+#include "file_handle.h"
+#include "macros.h"
+#include "structs.h"
+#include "utils.h"
 
 // arg compare opts
 const char *help_opts[] = {"--help", "help", "-h", NULL};       // help
@@ -36,39 +39,28 @@ int match_opt(const char *arg, const char **opts)
 // handle command-line arguments
 int args_handle(const char *option)
 {
-  // if (is_url(option)) {
-  //     // printf("[args] Playing URL: %s\n", option);
-  //     // char *path = strdup(option);
-  //     // start_playback(path);
-  //     // return 0;
-  // }
-  // else if (is_valid_path(option)) {
-  //     printf("[args] Playing file: %s\n", option);
-  //     char *path = strdup(option);
-  //     start_playback(path);
-  //     return 0;
-  // }
-  // else if (is_directory(option)) {
-  //     printf("[args] Directory not yet supported: %s\n", option);
-  //     return 1;
-  // }
-  // else if (is_valid_path(option)) {
-  //     printf("[args] Playing: %s\n", option);
-  //     char *path = strdup(option);
-  //     start_playback(path);
-  //     return 0;
-  // }
+  if (IS_URL(option)) {
+
+    printf("[args] Playing URL: %s\n", option);
+    strcpy(tctx.state.metadata.url, option);
+    queue_add(option);
+
+    return 0;
+  }
+  else if (IS_PATH(option)) {
+    printf("[args] Playing file: %s\n", option);
+    strcpy(tctx.state.metadata.url, option);
+    path_handle(option, &tctx.list);
+    return 0;
+  }
   if (match_opt(option, help_opts)) {
-      help();
-      return 1;
+    help();
   }
   else if (match_opt(option, ver_opts)) {
-      printf("tomu: %s\n", TOMU_VER);
-      return 1;
+    printf("tomu: %s\n", TOMU_VER);
   }
   else {
-      warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
-      // return 1;
+    warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
   }
-  return 0;
+  return 1;
 }
