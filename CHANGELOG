@@ -1,3 +1,15 @@
+# 6z7y 1.3.5-beta - 2026-07-01
+- support parsing url/file argument
+- uses ma_format value same audio file"
+- support parsing url/file argument
+- Added UTF-8 safe title truncation to prevent broken characters
+- Streamlined audio backend by removing unused buffer wrapper functions
+- Replaced is_url() usage with IS_URL macro
+- Removed redundant buffer stop handling in decoder
+- Improved MPRIS DBus integration and message handling
+- Improved cover extraction logic and reduced duplicate stream code
+- Increased metadata buffer sizes for safer string handling
+
 # 6z7y 1.3.4-beta - 2026-06-30
 - Return path handle from playback system
 - Add playlist URL support
