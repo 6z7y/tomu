@@ -2,101 +2,42 @@ CC           := cc
 # -O0 (for developer) / -O3 (for final binary)
 CFLAGS       := -Wall -Wextra -g -O0 -Iinclude $(shell pkg-config --cflags dbus-1)
 LIBS         := -lm -lcurl -lpthread -lavformat -lavcodec -lswresample -lavutil $(shell pkg-config --libs dbus-1)
-INSTALL_PATH := /usr/local/bin
 OBJECT_BUILD_DIR    := build
+INSTALL_PATH := /usr/local/bin
 
-# names
 TOMU_NAME    := tomu
-# TOMUCLI_NAME := tomucli
-# TOMUTUI_NAME := tomutui
-# TOMUGUI_NAME := tomugui
-
-# dirs
 TOMU_DIR    := src/tomu
-# TOMUCLI_DIR := src/tomucli
-# TOMUTUI_DIR := src/tomutui
-# TOMUGUI_DIR := src/tomugui
-SHARED_DIR  := src/shared
-
-# build dirs
 TOMU_BUILD_DIR    := $(OBJECT_BUILD_DIR)/tomu
-# TOMUCLI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomucli
-# TOMUTUI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomutui
-# TOMUGUI_BUILD_DIR := $(OBJECT_BUILD_DIR)/tomugui
-SHARED_BUILD_DIR  := $(OBJECT_BUILD_DIR)/shared
-
-# sources
 TOMU_SRC    := $(wildcard $(TOMU_DIR)/*.c)
-# TOMUCLI_SRC := $(wildcard $(TOMUCLI_DIR)/*.c)
-# TOMUTUI_SRC := $(wildcard $(TOMUTUI_DIR)/*.c)
-# TOMUGUI_SRC := $(wildcard $(TOMUGUI_DIR)/*.c)
-SHARED_SRC  := $(wildcard $(SHARED_DIR)/*.c)
-
-# objects
 TOMU_OBJECTS    := $(patsubst $(TOMU_DIR)/%.c, $(TOMU_BUILD_DIR)/%.o, $(TOMU_SRC))
-# TOMUCLI_OBJECTS := $(patsubst $(TOMUCLI_DIR)/%.c, $(TOMUCLI_BUILD_DIR)/%.o, $(TOMUCLI_SRC))
-# TOMUTUI_OBJECTS := $(patsubst $(TOMUTUI_DIR)/%.c, $(TOMUTUI_BUILD_DIR)/%.o, $(TOMUTUI_SRC))
-# TOMUGUI_OBJECTS := $(patsubst $(TOMUGUI_DIR)/%.c, $(TOMUGUI_BUILD_DIR)/%.o, $(TOMUGUI_SRC))
-SHARED_OBJECTS  := $(patsubst $(SHARED_DIR)/%.c, $(SHARED_BUILD_DIR)/%.o, $(SHARED_SRC))
 
-# build all
-all: $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUTUI_NAME) $(TOMUGUI_NAME)
+# build
+all: $(TOMU_NAME)
 
-# linking (IMPORTANT: include shared objects)
-$(TOMU_NAME): $(TOMU_OBJECTS) $(SHARED_OBJECTS)
+$(TOMU_NAME): $(TOMU_OBJECTS)
 	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
-
-# $(TOMUCLI_NAME): $(TOMUCLI_OBJECTS) $(SHARED_OBJECTS)
-# 	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
-
-# $(TOMUTUI_NAME): $(TOMUTUI_OBJECTS) $(SHARED_OBJECTS)
-# 	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
-#
-# $(TOMUGUI_NAME): $(TOMUGUI_OBJECTS) $(SHARED_OBJECTS)
-# 	$(CC) $^ -o $@ $(CFLAGS) $(LIBS)
-
 
 # compile rules (per folder)
 $(TOMU_BUILD_DIR)/%.o: $(TOMU_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-# $(TOMUCLI_BUILD_DIR)/%.o: $(TOMUCLI_DIR)/%.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) -c $< -o $@ $(CFLAGS)
-
-# $(TOMUTUI_BUILD_DIR)/%.o: $(TOMUTUI_DIR)/%.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) -c $< -o $@ $(CFLAGS)
-#
-# $(TOMUGUI_BUILD_DIR)/%.o: $(TOMUGUI_DIR)/%.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) -c $< -o $@ $(CFLAGS)
-
-$(SHARED_BUILD_DIR)/%.o: $(SHARED_DIR)/%.c
-	@mkdir -p $(dir $@)
-	$(CC) -c $< -o $@ $(CFLAGS)
-
 # install
 install: all
 	mkdir -p $(HOME)/.config/tomu
-	install -m755 discord_rich_presence.py ~/.config/tomu/
-	sudo install -m755 $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUTUI_NAME) $(TOMUGUI_NAME) $(INSTALL_PATH)
+	@echo "\033[0;33mrequesting root permission, for install tomu\033[0m"
+	sudo install -m755 $(TOMU_NAME) $(INSTALL_PATH)
+	@echo "\033[0;32mDone\033[0m"
 
-# clean
 clean:
-	rm -rf $(OBJECT_BUILD_DIR) $(TOMU_NAME) $(TOMUCLI_NAME) $(TOMUGUI_NAME) $(TOMUTUI_NAME)
+	rm -rf $(OBJECT_BUILD_DIR) $(TOMU_NAME)
 
-# uninstall
+update:
+	@echo "\033[0;32mFetching latest tomu source...\033[0m"
+	git pull
+
 uninstall:
-	sudo rm -f /usr/bin/$(TOMU_NAME)
-	sudo rm -f /usr/bin/$(TOMUCLI_NAME)
-	sudo rm -f /usr/bin/$(TOMUTUI_NAME)
-	sudo rm -f /usr/bin/$(TOMUGUI_NAME)
-
-	sudo rm -f $(INSTALL_PATH)/$(TOMU_NAME)
-	sudo rm -f $(INSTALL_PATH)/$(TOMUCLI_NAME)
-	sudo rm -f $(INSTALL_PATH)/$(TOMUTUI_NAME)
-	sudo rm -f $(INSTALL_PATH)/$(TOMUGUI_NAME)
+	sudo rm -f /usr/local/bin/tomu
+	@echo "\033[0;32mUninstalled successfully\033[0m"
 
 .PHONY: all install clean uninstall
