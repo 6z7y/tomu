@@ -8,6 +8,7 @@
 #include "audio_backend.h"
 #include "errors.h"
 #include "structs.h"
+#include "utils.h"
 
 // function take from planar_value to get interleaved_value
 enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
@@ -290,6 +291,28 @@ static void apply_metadata_dict(Audio_Metadata *m, AVDictionary *dict)
     }
 }
 
+// Back up over any incomplete UTF-8 sequence left by a byte-based truncation
+static void utf8_safe_truncate(char *s)
+{
+    size_t len = strlen(s);
+    if (len == 0) return;
+
+    // find start of last codepoint
+    size_t i = len;
+    while (i > 0 && (s[i-1] & 0xC0) == 0x80) i--; // skip continuation bytes
+    if (i == 0) { s[0] = '\0'; return; }
+
+    unsigned char lead = (unsigned char)s[i-1];
+    int seq_len = 1;
+    if ((lead & 0xE0) == 0xC0) seq_len = 2;
+    else if ((lead & 0xF0) == 0xE0) seq_len = 3;
+    else if ((lead & 0xF8) == 0xF0) seq_len = 4;
+
+    size_t have = len - (i - 1);
+    if (have < (size_t)seq_len) {
+        s[i-1] = '\0'; // incomplete sequence, cut it off
+    }
+}
 void get_metadata(const char *filename)
 {
     Audio_Metadata *m = &tctx.state.metadata;
@@ -334,6 +357,7 @@ void get_metadata(const char *filename)
         }
     }
 
+    utf8_safe_truncate(m->title);   // <-- add this line
     m->title[sizeof(m->title)-1] = '\0';
     m->artist[sizeof(m->artist)-1] = '\0';
     m->album[sizeof(m->album)-1] = '\0';
@@ -359,132 +383,59 @@ static unsigned long fnv1a_hash(const char *str) {
 
 // Helper: extract filename without path and build full output path
 void build_output_path(const char *input, char *out, size_t size) {
-    // Get just the filename from the full path (for a readable suffix only)
     const char *base = strrchr(input, '/');
     base = (base) ? base + 1 : input;
 
-    char name_without_ext[256];
-    strncpy(name_without_ext, base, sizeof(name_without_ext) - 1);
-    name_without_ext[sizeof(name_without_ext) - 1] = '\0';
+    char name[256];
+    strncpy(name, base, sizeof(name) - 1);
+    name[sizeof(name) - 1] = '\0';
 
-    char *dot = strrchr(name_without_ext, '.');
+    char *dot = strrchr(name, '.');
     if (dot) *dot = '\0';
 
-    // Build full path: /tmp/tomu_cover_img/<hash-of-full-path>_<filename>.jpg
-    // The hash of the FULL input path is what guarantees uniqueness; the
-    // filename suffix is just there to make the cache dir human-readable.
-    snprintf(out, size, "/tmp/tomu_cover_img/%lx_%s.jpg", fnv1a_hash(input), name_without_ext);
+    snprintf(out, size, "/tmp/tomu_cover_img/%s.jpg", name);
 }
 
 int get_cover(AVFormatContext *fmt, const char *input) {
-    // Create directory properly
-    system("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
+    run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
 
-    // Build output path keyed off the full input path (collision-proof),
-    // see build_output_path() / fnv1a_hash() above for why.
     char output_path[512];
     build_output_path(input, output_path, sizeof(output_path));
-    
+
     printf("Looking for cover in: %s\n", input);
     printf("Will save to: %s\n", output_path);
-    
-    // Search for attached picture in streams
+
     for (unsigned int i = 0; i < fmt->nb_streams; i++) {
         AVStream *stream = fmt->streams[i];
-        
+
         if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
             AVPacket pkt = stream->attached_pic;
-            
+
             FILE *f = fopen(output_path, "wb");
             if (!f) {
                 printf("Could not create output file: %s\n", output_path);
                 return 1;
             }
-            
-            size_t written = fwrite(pkt.data, 1, pkt.size, f);
+
+            fwrite(pkt.data, 1, pkt.size, f);
             fclose(f);
-            
-            if (written == pkt.size) {
-                printf("✅ Cover saved: %s (%zu bytes)\n", output_path, written);
-                // Store cover path in metadata for MPRIS
-                strncpy(tctx.state.metadata.cover_path, output_path, sizeof(tctx.state.metadata.cover_path) - 1);
-                return 0;
-            }
+
+            printf("✅ Cover saved: %s\n", output_path);
+
+            strncpy(tctx.state.metadata.cover_path,
+                    output_path,
+                    sizeof(tctx.state.metadata.cover_path) - 1);
+
+            return 0;
         }
     }
-    
+
     printf("No cover art found in file\n");
     return 1;
 }
 
 // Add this to backend_utils.c after get_cover():
-int extract_cover(const char *input, AVFormatContext *fmt_tctx) {
+int extract_cover(const char *input) {
     printf("Extracting cover from: %s\n", input);
-    return get_cover(fmt_tctx, input);
-}
-
-// Add this function to backend_utils.c - extracts cover art from any format context
-// Add this function to backend_utils.c - extracts cover art from any format context
-int extract_cover_from_stream(AVFormatContext *fmt) {
-    if (!fmt) return 1;
-    
-    // If we already have a cover from yt-dlp, don't override it
-    if (strlen(tctx.state.metadata.cover_path) > 0) {
-        printf("[cover] Already have cover from yt-dlp: %s\n", tctx.state.metadata.cover_path);
-        return 0;
-    }
-    
-    // Create directory
-    system("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
-    
-    char output_path[512];
-    
-    // Use title if available, otherwise use timestamp
-    if (strlen(tctx.state.metadata.title) > 0) {
-        char clean_title[256];
-        strncpy(clean_title, tctx.state.metadata.title, sizeof(clean_title) - 1);
-        // Sanitize
-        for (int i = 0; clean_title[i]; i++) {
-            if (clean_title[i] == '/' || clean_title[i] == '\\' || 
-                clean_title[i] == ':' || clean_title[i] == '*' || 
-                clean_title[i] == '?' || clean_title[i] == '"' || 
-                clean_title[i] == '<' || clean_title[i] == '>' || 
-                clean_title[i] == '|' || clean_title[i] == ' ') {
-                clean_title[i] = '_';
-            }
-        }
-        snprintf(output_path, sizeof(output_path), "/tmp/tomu_cover_img/%s.jpg", clean_title);
-    } else {
-        snprintf(output_path, sizeof(output_path), "/tmp/tomu_cover_img/stream_cover_%ld.jpg", time(NULL));
-    }
-    
-    printf("[cover] Looking for cover art in stream...\n");
-    printf("[cover] Will save to: %s\n", output_path);
-    
-    // Search for attached picture in streams
-    for (unsigned int i = 0; i < fmt->nb_streams; i++) {
-        AVStream *stream = fmt->streams[i];
-        
-        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-            AVPacket pkt = stream->attached_pic;
-            
-            FILE *f = fopen(output_path, "wb");
-            if (!f) {
-                printf("[cover] Could not create output file: %s\n", output_path);
-                return 1;
-            }
-            
-            size_t written = fwrite(pkt.data, 1, pkt.size, f);
-            fclose(f);
-            
-            if (written == pkt.size) {
-                printf("[cover] ✅ Cover saved: %s (%zu bytes)\n", output_path, written);
-                strncpy(tctx.state.metadata.cover_path, output_path, sizeof(tctx.state.metadata.cover_path) - 1);
-                return 0;
-            }
-        }
-    }
-    
-    printf("[cover] No cover art found in stream\n");
-    return 1;
+    return get_cover(tctx.fmtCTX, input);
 }
