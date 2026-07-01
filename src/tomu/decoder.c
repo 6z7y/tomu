@@ -331,14 +331,6 @@ decode:
     pthread_cond_broadcast(&state->wait_cond);
     pthread_mutex_unlock(&state->lock);
 
-    // FIX: Check if buf exists before accessing its lock
-    if (tctx.buf) {
-        pthread_mutex_lock(&tctx.buf->lock);
-        tctx.buf->stopped = 1;
-        pthread_cond_broadcast(&tctx.buf->data_ready);
-        pthread_mutex_unlock(&tctx.buf->lock);
-    }
-
     pthread_mutex_lock(&tctx.buf->lock);
     tctx.buf->stopped = 1;
     pthread_cond_broadcast(&tctx.buf->data_ready);
