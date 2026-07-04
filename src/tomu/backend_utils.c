@@ -7,6 +7,7 @@
 #include "../../libs/miniaudio.h"
 #include "audio_backend.h"
 #include "errors.h"
+#include "mpris.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -125,51 +126,29 @@ int get_audio_info(const char *filename)
 
   // Store audio info to a struct audio
   store_information(audioStream_index, sample_fmt);
+  mpris_notify_change();
 
   return 0;
 }
 
 // Setup SWR context convert
-// Setup SWR context for format conversion
-// Setup SWR context - FORCE S16 interleaved
 int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
 {
-    AVCodecContext *codecCTX = tctx.codecCTX;
-    
-    #ifdef LEGACY_LIBSWRSAMPLE
-        // Legacy FFmpeg
-        *swrCTX = swr_alloc_set_opts(NULL,
-            codecCTX->channel_layout, AV_SAMPLE_FMT_S16, codecCTX->sample_rate, // output: S16
-            codecCTX->channel_layout, codecCTX->sample_fmt, codecCTX->sample_rate, // input: native
-            0, NULL
-        );
-    #else
-        // New FFmpeg
-        AVChannelLayout out_layout;
-        av_channel_layout_default(&out_layout, codecCTX->ch_layout.nb_channels);
-        
-        int ret = swr_alloc_set_opts2(swrCTX,
-            &out_layout, AV_SAMPLE_FMT_S16, codecCTX->sample_rate, // output: S16
-            &codecCTX->ch_layout, codecCTX->sample_fmt, codecCTX->sample_rate, // input: native
-            0, NULL
-        );
-        av_channel_layout_uninit(&out_layout);
-        
-        if (ret < 0) {
-            fprintf(stderr, "[resampler] Failed to set options: %d\n", ret);
-            return 0;
-        }
-    #endif
+  #ifdef LEGACY_LIBSWRSAMPLE
+    *swrCTX = swr_alloc_set_opts(*swrCTX,
+      inf->ch_layout, inf->sample_fmt, inf->sample_rate, // output
+      inf->ch_layout, tctx.codecCTX->sample_fmt, inf->sample_rate, // input
+      0, NULL
+    );
+  #else
+    swr_alloc_set_opts2(swrCTX,
+      &inf->ch_layout, inf->sample_fmt, inf->sample_rate, // output
+      &inf->ch_layout, tctx.codecCTX->sample_fmt, inf->sample_rate, // input
+      0, NULL
+    );
+  #endif
 
-    if (*swrCTX) {
-        printf("[resampler] Forcing S16: input fmt=%d, output fmt=S16, channels=%d, rate=%d\n",
-               codecCTX->sample_fmt, (int)codecCTX->channel_layout, codecCTX->sample_rate);
-    } else {
-        fprintf(stderr, "[resampler] Failed to allocate\n");
-        return 0;
-    }
-
-    return 1;
+  return 1;
 }
 
 void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX)
@@ -212,7 +191,7 @@ void init_playbackstatus(TomuStatus *state, int loop, int shuffle)
     state->paused = 0;
     state->seek_request = 0;
     state->seek_target = 0;
-    state->looping = loop;
+    state->loop = loop;
     state->shuffle = shuffle;
     state->volume = 1.0f;
     state->speed = 1.0f;
@@ -367,20 +346,6 @@ void get_metadata(const char *filename)
     m->track[sizeof(m->track)-1] = '\0';
 }
 
-///////////////////////////////////////////////////// about extract cover img
-// Tiny FNV-1a hash so we can key the cover cache off the FULL input path,
-// not just the basename — avoids two different files that happen to share
-// a filename (e.g. "01.flac" in two different album folders) colliding on
-// the same /tmp cache entry and showing each other's stale cover art.
-static unsigned long fnv1a_hash(const char *str) {
-    unsigned long hash = 2166136261UL;
-    while (*str) {
-        hash ^= (unsigned char)(*str++);
-        hash *= 16777619UL;
-    }
-    return hash;
-}
-
 // Helper: extract filename without path and build full output path
 void build_output_path(const char *input, char *out, size_t size) {
     const char *base = strrchr(input, '/');
@@ -402,8 +367,8 @@ int get_cover(AVFormatContext *fmt, const char *input) {
     char output_path[512];
     build_output_path(input, output_path, sizeof(output_path));
 
-    printf("Looking for cover in: %s\n", input);
-    printf("Will save to: %s\n", output_path);
+    // printf("Looking for cover in: %s\n", input);
+    // printf("Will save to: %s\n", output_path);
 
     for (unsigned int i = 0; i < fmt->nb_streams; i++) {
         AVStream *stream = fmt->streams[i];
@@ -420,7 +385,7 @@ int get_cover(AVFormatContext *fmt, const char *input) {
             fwrite(pkt.data, 1, pkt.size, f);
             fclose(f);
 
-            printf("✅ Cover saved: %s\n", output_path);
+            // printf("✅ Cover saved: %s\n", output_path);
 
             strncpy(tctx.state.metadata.cover_path,
                     output_path,
@@ -436,6 +401,6 @@ int get_cover(AVFormatContext *fmt, const char *input) {
 
 // Add this to backend_utils.c after get_cover():
 int extract_cover(const char *input) {
-    printf("Extracting cover from: %s\n", input);
+    // printf("Extracting cover from: %s\n", input);
     return get_cover(tctx.fmtCTX, input);
 }
