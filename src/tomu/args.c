@@ -37,30 +37,17 @@ int match_opt(const char *arg, const char **opts)
 }
 
 // handle command-line arguments
-int args_handle(const char *option)
+void args_handle(const char *option, const char *src)
 {
-  if (IS_URL(option)) {
+  int result_src_checking = handle_src(src);
+  if (result_src_checking > 0) return;
 
-    printf("[args] Playing URL: %s\n", option);
-    strcpy(tctx.state.metadata.url, option);
-    queue_add(option);
+  else if (match_opt(option, help_opts)) help();
 
-    return 0;
-  }
-  else if (IS_PATH(option)) {
-    printf("[args] Playing file: %s\n", option);
-    strcpy(tctx.state.metadata.url, option);
-    path_handle(option, &tctx.list);
-    return 0;
-  }
-  if (match_opt(option, help_opts)) {
-    help();
-  }
-  else if (match_opt(option, ver_opts)) {
-    printf("tomu: %s\n", TOMU_VER);
-  }
-  else {
-    warn("tomu: unknown option '%s'\n\ntry '%s --help'", option, TOMU_NAME);
-  }
-  return 1;
+  else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
+
+  else 
+    warn("tomu: unknown option '%s'\n  try '%s --help'", option, TOMU_NAME);
+
+  exit(0);
 }
