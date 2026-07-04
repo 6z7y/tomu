@@ -15,94 +15,6 @@
 
 #include "../../libs/miniaudio.h"
 
-// Thread to get audio info without playing
-// Thread to get audio info without playing
-// In get_audio_info_thread, after extracting metadata:
-void *get_audio_info_thread(void *arg)
-{
-    (void)arg;
-    printf("[info_thread] Getting audio info...\n");
-    
-    AVFormatContext *fmtCTX = tctx.fmtCTX;
-    if (!fmtCTX) {
-        fprintf(stderr, "[info_thread] No format context\n");
-        return NULL;
-    }
-
-    if (avformat_find_stream_info(fmtCTX, NULL) < 0) {
-        fprintf(stderr, "[info_thread] Failed to find stream info\n");
-        return NULL;
-    }
-
-    int audioStream_index = -1;
-    for (unsigned int i = 0; i < fmtCTX->nb_streams; i++) {
-        if (fmtCTX->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            audioStream_index = i;
-            break;
-        }
-    }
-
-    if (audioStream_index < 0) {
-        fprintf(stderr, "[info_thread] No audio stream found\n");
-        return NULL;
-    }
-
-    const AVCodecParameters *codecPAR = fmtCTX->streams[audioStream_index]->codecpar;
-    const AVCodec *codecTYPE = avcodec_find_decoder(codecPAR->codec_id);
-    if (!codecTYPE) {
-        fprintf(stderr, "[info_thread] Unsupported codec\n");
-        return NULL;
-    }
-
-    AVCodecContext *codecCTX = avcodec_alloc_context3(codecTYPE);
-    if (!codecCTX) {
-        fprintf(stderr, "[info_thread] Failed to allocate codec context\n");
-        return NULL;
-    }
-
-    avcodec_parameters_to_context(codecCTX, codecPAR);
-    if (avcodec_open2(codecCTX, codecTYPE, NULL) < 0) {
-        fprintf(stderr, "[info_thread] Failed to open codec\n");
-        avcodec_free_context(&codecCTX);
-        return NULL;
-    }
-
-    tctx.codecCTX = codecCTX;
-
-    // Store audio info
-    #ifdef LEGACY_LIBSWRSAMPLE
-        tctx.inf.ch = codecCTX->channels;
-        tctx.inf.ch_layout = codecCTX->channel_layout;
-    #else
-        tctx.inf.ch = codecCTX->ch_layout.nb_channels;
-        tctx.inf.ch_layout = codecCTX->ch_layout;
-    #endif
-
-    tctx.inf.audioStream_index = audioStream_index;
-    tctx.inf.audioStream = fmtCTX->streams[audioStream_index];
-    tctx.inf.sample_rate = codecCTX->sample_rate;
-    tctx.inf.sample_fmt = AV_SAMPLE_FMT_FLT;
-    tctx.inf.sample_fmt_bytes = sizeof(float);
-    tctx.inf.ma_fmt = ma_format_f32;
-
-    int duration_sec = fmtCTX->duration / 1000000;
-    tctx.state.duration = duration_sec;
-
-    printf("[info_thread] Audio info: channels=%d, rate=%d, duration=%d\n",
-           tctx.inf.ch, tctx.inf.sample_rate, duration_sec);
-
-    // Metadata is already extracted in start_playback_thread
-    printf("[info_thread] FINAL METADATA:\n");
-    printf("  Title:  [%s]\n", tctx.state.metadata.title[0] ? tctx.state.metadata.title : "(empty)");
-    printf("  Artist: [%s]\n", tctx.state.metadata.artist[0] ? tctx.state.metadata.artist : "(empty)");
-    printf("  Cover:  [%s]\n", tctx.state.metadata.cover_path[0] ? tctx.state.metadata.cover_path : "(empty)");
-    
-    // Force MPRIS update
-    mpris_notify_change();
-
-    return NULL;
-}
-
 // Main decoder thread - works like the test program
 void *run_decoder(void *arg)
 {
@@ -317,12 +229,14 @@ decode:
     }
 
     // Looping only for local files
-    if (!tctx.stream_ctx.is_streaming && state->looping && state->running) {
+    if (!tctx.stream_ctx.is_streaming && state->loop == LOOP_TRACK && state->running) {
         av_seek_frame(fmtCTX, -1, 0, AVSEEK_FLAG_BACKWARD);
         avcodec_flush_buffers(codecCTX);
         total_samples_played = 0;
         goto decode;
     }
+    usleep(1000*1000);
+
 
     // In run_decoder() cleanup section:
     // Cleanup
@@ -336,8 +250,8 @@ decode:
     pthread_cond_broadcast(&tctx.buf->data_ready);
     pthread_mutex_unlock(&tctx.buf->lock);
 
-    if (tctx.stream_ctx.is_streaming) {
-        streaming_cleanup(&tctx);
+    if (tctx.list.src_type == SRC_URL_RAW) {
+        streaming_cleanup(&tctx.stream_ctx);
     }
 
     if (swrCTX) swr_free(&swrCTX);
