@@ -6,7 +6,6 @@
 #include <ctype.h>
 #include <dbus/dbus.h>
 #include <stdarg.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "mpris.h"
@@ -132,8 +131,9 @@ static void append_metadata(DBusMessageIter *var) {
         dict_add_strarray1(&arr, "xesam:artist", tctx.state.metadata.artist);
 
     // Art Url (cover)
-    if (tctx.state.metadata.cover_path[0])
+    if (tctx.state.metadata.cover_path[0]) {
       dict_add_string(&arr, "mpris:artUrl", tctx.state.metadata.cover_path);
+    }
 
     // track
     if (strlen(tctx.state.metadata.track) > 0)
@@ -174,8 +174,11 @@ static void append_property(DBusMessageIter *target, const char *iface, const ch
     (void)iface;
     if (!strcmp(prop, "PlaybackStatus"))
         var_string(target, tctx.state.paused ? "Paused" : (tctx.state.running ? "Playing" : "Stopped"));
+
     else if (!strcmp(prop, "LoopStatus"))
-        var_string(target, tctx.state.looping ? "Playlist" : "None");
+        var_string(target, tctx.state.loop == LOOP_PLAYLIST ? "Playlist" :
+          tctx.state.loop == LOOP_TRACK ? "Track" : "None");
+
     else if (!strcmp(prop, "Rate"))         var_double(target, tctx.state.speed);
     else if (!strcmp(prop, "MinimumRate")) var_double(target, 1.0);
     else if (!strcmp(prop, "MaximumRate")) var_double(target, 1.0);
@@ -261,7 +264,15 @@ static void handle_set(DBusMessage *msg) {
     else if (!strcmp(prop, "LoopStatus")) {
         const char *val;
         dbus_message_iter_get_basic(&var, &val);
-        tctx.state.looping = (strcmp(val, "None") != 0);
+        if (!strcmp(val, "None"))
+          tctx.state.loop = LOOP_NONE; // 0
+
+        else if (!strcmp(val, "Track"))
+          tctx.state.loop = LOOP_TRACK; // 1
+
+        else if (!strcmp(val, "Playlist"))
+          tctx.state.loop = LOOP_PLAYLIST; // 2
+
     }
     else if (!strcmp(prop, "Shuffle")) {
         dbus_bool_t val;
@@ -331,13 +342,7 @@ static void handle_message(DBusMessage *msg) {
     else if (dbus_message_is_method_call(msg, IFACE_PLAYER, "Seek")) {
         dbus_int64_t offset;
         dbus_message_get_args(msg, NULL, DBUS_TYPE_INT64, &offset, DBUS_TYPE_INVALID);
-        WITH_LOCK(tctx.state.lock) {
-            if (!tctx.state.seek_request) {
-                tctx.state.seek_request = 1;
-                tctx.state.seek_target = offset; // microseconds
-                pthread_cond_broadcast(&tctx.state.wait_cond);
-            }
-        }
+        seek_playback(&tctx.state, offset);
         reply_empty(msg);
         mpris_notify_change();
     }
@@ -357,20 +362,30 @@ static void handle_message(DBusMessage *msg) {
         mpris_notify_change();
     }
     else if (dbus_message_is_method_call(msg, IFACE_PLAYER, "OpenUri")) {
-        const char *uri;
+        char *url;
         dbus_error_init(err);
-        if (dbus_message_get_args(msg, err, DBUS_TYPE_STRING, &uri, DBUS_TYPE_INVALID)) {
+        if (dbus_message_get_args(msg, err, DBUS_TYPE_STRING, &url, DBUS_TYPE_INVALID)) {
             reply_empty(msg);
-            strcpy(tctx.state.metadata.url, uri);
-            const char *path = uri;
-            char *decoded = NULL;
-            if (strncmp(uri, "file://", 7) == 0) {
-                decoded = strdup(uri + 7);
-                url_decode(decoded);
-                path = decoded;
-            }
-            queue_add(path);
-            free(decoded);
+
+            char *decoded = strdup(url);
+            url_decode(decoded);
+
+            char *path = decoded;
+            if (!strncmp(path, "file://", 7)) path += 7;
+            printf("get '%s'\n", path);
+
+            queue_add(path, checking_src_type(path));
+             // free(path);
+            // printf()
+            // const char *path = uri;
+            // char *decoded = NULL;
+            // if (strncmp(uri, "file://", 7) == 0) {
+            //     decoded = strdup(uri + 7);
+            //     url_decode(decoded);
+            //     path = decoded;
+            // }
+            // queue_add(path, SRC_FILE_RAW);
+            // free(decoded);
         } else {
             DBusMessage *error = dbus_message_new_error(msg,
                 "org.freedesktop.DBus.Error.InvalidArgs", "Invalid URI argument");

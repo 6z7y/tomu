@@ -1,6 +1,7 @@
 #ifndef APP_STRUCTS_H
 #define APP_STRUCTS_H
 
+#include <curl/curl.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
@@ -10,7 +11,6 @@
 #include "dbus/dbus.h"
 
 #include "../../libs/miniaudio.h"
-
 
 #if LIBSWRESAMPLE_VERSION_MAJOR <= 3
   #define LEGACY_LIBSWRSAMPLE
@@ -24,6 +24,22 @@ typedef struct {
 
 } DBus_SYSTEM;
 // -----------------------------
+
+typedef enum {
+  LOOP_NONE,
+  LOOP_TRACK,
+  LOOP_PLAYLIST
+
+} LOOP_TYPE;
+
+typedef enum {
+  SRC_NONE, // error
+  SRC_FILE_DIR,
+  SRC_FILE_RAW,
+  SRC_URL_PLAYLIST,
+  SRC_URL_RAW,
+
+} SRC_TYPE;
 
 typedef struct {
     char title[256];          // song name
@@ -47,7 +63,7 @@ typedef struct {
   int skip_to_next;
   float volume;
   float speed;
-  atomic_int looping;
+  LOOP_TYPE loop;
   int shuffle;
   int seek_request;
   int64_t seek_target;
@@ -81,6 +97,21 @@ typedef struct {
     pthread_cond_t  more_data;
 } StreamBuf;
 
+// Ring buffer for PCM data
+// In DATA.h, update the AudioRing to store float samples like the test program
+typedef struct {
+  float *data;            // Changed to float*
+  size_t write_pos;
+  size_t read_pos;
+  size_t count;           /* samples currently held (not bytes) */
+  size_t capacity;        /* in samples */
+  int channels;
+  pthread_mutex_t lock;
+  pthread_cond_t has_space;
+  pthread_cond_t has_data;
+  int stopped;
+} AudioRing;
+
 // struct for base information of audio file (codec)
 typedef struct {
   int audioStream_index;
@@ -102,6 +133,7 @@ typedef struct {
     char **queue_lists;
     int queue_count;
     int queue_index;
+    SRC_TYPE src_type;
     int filter_files;
     pthread_t pt;
     pthread_mutex_t lock;
@@ -110,6 +142,7 @@ typedef struct {
 
 
 typedef struct {
+    CURL *curl;              // handle url
     char *stream_url;        // resolved direct audio URL
     char *original_url;      // original user-provided URL
     int is_streaming;        // 1 if this is a streaming URL
@@ -120,20 +153,6 @@ typedef struct {
 } StreamContext;
 
 
-// Ring buffer for PCM data
-// In DATA.h, update the AudioRing to store float samples like the test program
-typedef struct {
-    float *data;            // Changed to float*
-    size_t write_pos;
-    size_t read_pos;
-    size_t count;           /* samples currently held (not bytes) */
-    size_t capacity;        /* in samples */
-    int channels;
-    pthread_mutex_t lock;
-    pthread_cond_t has_space;
-    pthread_cond_t has_data;
-    int stopped;
-} AudioRing;
 
 // struct for point context used in another functions (needed)
 typedef struct PlayBackContext{

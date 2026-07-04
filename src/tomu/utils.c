@@ -16,6 +16,7 @@
 #include "mpris.h"
 #include "streaming.h"
 
+
 // build string and return it
 char *format(const char *fmt, ...)
 {
@@ -47,7 +48,6 @@ unsigned int get_rand()
   return n;
 }
 
-
 // function run command
 void run_command(char *cmd)
 {
@@ -64,7 +64,7 @@ void run_command(char *cmd)
 void cleanUP(){
   // First, clean up streaming if active
   if (tctx.stream_ctx.is_streaming) {
-    streaming_cleanup(&tctx);
+    streaming_cleanup(&tctx.stream_ctx);
   }
   
   // Then clean up FFmpeg contexts
@@ -78,14 +78,18 @@ void cleanUP(){
   }
 }
 
-void sig_clean(int sig)
+void signal_handle(int sig)
 {
+  (void)sig;
+
+  printf("exit..\n");
   // Clean up streaming if active
   if (tctx.stream_ctx.is_streaming) {
     streaming_stop(&tctx);
   }
   for (int i = 0; i < tctx.list.queue_count; i++) free(tctx.list.queue_lists[i]);
   free(tctx.list.queue_lists);
+  curl_global_cleanup();
 
   cleanUP();
   _exit(0);
@@ -96,24 +100,21 @@ void *playback_queue_thread(void *arg) {
     while (1) {
         pthread_mutex_lock(&tctx.list.lock);
         while (tctx.list.queue_index >= tctx.list.queue_count) {
-            // int idx = get_rand() % tctx.list.queue_count;
 
             pthread_cond_wait(&tctx.list.item_ready, &tctx.list.lock);
         }
         if (tctx.state.shuffle) {
-          char *path = strdup(tctx.list.queue_lists[tctx.list.queue_index]);
+          int idx = get_rand() % tctx.list.queue_count;
+          strdup(tctx.list.queue_lists[idx]);
 
         }
         char *path = strdup(tctx.list.queue_lists[tctx.list.queue_index]);
         pthread_mutex_unlock(&tctx.list.lock);
 
-        int is_url_path = strncmp(path, "http://", 7) == 0 ||
-                          strncmp(path, "https://", 8) == 0;
-
         // FIX: Clear metadata BEFORE getting new metadata
         memset(&tctx.state.metadata, 0, sizeof(Audio_Metadata));
         
-        if (is_url_path) {
+        if (IS_URL_RAW(path)) {
             get_metadata_from_url(path, &tctx.state.metadata);
             char *resolved = resolve_url(path);
             if (resolved && strcmp(resolved, path) != 0) {
@@ -122,12 +123,7 @@ void *playback_queue_thread(void *arg) {
             }
         }
 
-        tctx.state.running  = 1;
-        tctx.state.paused   = 0;
-        tctx.state.position = 0;
-        tctx.playback_active = 1;
-
-        playback_run(path, 0, 1);
+        playback_run(path, tctx.state.loop, 1);
         free(path);
 
         tctx.playback_active = 0;
@@ -140,16 +136,36 @@ void *playback_queue_thread(void *arg) {
               tctx.buf = NULL;
           }
 
+          if (tctx.state.loop == LOOP_PLAYLIST){
+            tctx.list.queue_index = (tctx.list.queue_index + 1) % tctx.list.queue_count;
+          }
+          else 
             tctx.list.queue_index++;
+
         } else if (tctx.state.skip_to_next == -1) {
 
+          if (tctx.buf) {
+            audio_buffer_destroy(tctx.buf);
+            tctx.buf = NULL;
+          }
+
+          if (tctx.state.loop == LOOP_PLAYLIST)
+            tctx.list.queue_index = (tctx.list.queue_index - 1 + tctx.list.queue_count) % tctx.list.queue_count;
+          else  {
             if (tctx.list.queue_index > 0)
               tctx.list.queue_index--;
-                if (tctx.buf) {
-                  audio_buffer_destroy(tctx.buf);
-                  tctx.buf = NULL;
-                }
+          }
+
         } else {
+
+          if (tctx.state.loop == LOOP_PLAYLIST) {
+            printf("jhhh\n");
+            if (!tctx.state.running)
+              tctx.list.queue_index = (tctx.list.queue_index + 1) % tctx.list.queue_count;
+            printf("222\n");
+          }
+
+          else 
             tctx.list.queue_index++;
         }
         tctx.state.skip_to_next = 0; // reset
@@ -176,8 +192,8 @@ void mpris_init(void) {
 
 void first_init()
 {
+  mpris_init();
     curl_global_init(CURL_GLOBAL_ALL);
-    mpris_init();
     tctx.list.filter_files = 1;
 
     pthread_mutex_init(&tctx.list.lock, NULL);
