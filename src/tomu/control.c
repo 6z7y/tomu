@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include "dbus/dbus.h"
 #include "macros.h"
 #include "control.h"
 
@@ -27,52 +28,12 @@ void playback_stop(TomuStatus *state){
 // =================================================================
 
 // control audio seek
-
-// Requests a seek forward by 5 seconds
-void seek_forward_sec(TomuStatus *state)
+void seek_playback(TomuStatus *state, dbus_int64_t offset)
 {
   WITH_LOCK(state->lock) {
     if (!state->seek_request){
       state->seek_request = 1;
-      state->seek_target = +5000000; // +5 sec in microsec
-      pthread_cond_broadcast(&state->wait_cond);
-    }
-  }
-}
-
-
-// Requests a seek forward by 1 min
-void seek_forward_min(TomuStatus *state)
-{
-  WITH_LOCK(state->lock) {
-    if (!state->seek_request){
-      state->seek_request = 1;
-      state->seek_target = +60000000; // +60 sec in microsec
-      pthread_cond_broadcast(&state->wait_cond);
-    }
-  }
-}
-
-// Requests a seek backward by 5 seconds
-void seek_backward_sec(TomuStatus *state)
-{
-  WITH_LOCK(state->lock) {
-    if (!state->seek_request){
-      state->seek_request = 1;
-      state->seek_target = -5000000; // -5 sec in microsec
-      pthread_cond_broadcast(&state->wait_cond);
-    }
-  }
-}
-
-// Requests a seek backward by 1 min
-void seek_backward_min(TomuStatus *state)
-{
-  WITH_LOCK(state->lock) {
-    if (!state->seek_request){
-      state->seek_request = 1;
-      state->seek_target = -60000000; // -60 sec in microsec
-      pthread_cond_broadcast(&state->wait_cond);
+      state->seek_target = offset;
     }
   }
 }
@@ -104,25 +65,10 @@ void playback_speed_decrease(TomuStatus *state)
   }
 }
 
-// control volume playback
-inline void volume_increase(TomuStatus *state){
-  WITH_LOCK(state->lock) {
-    state->volume += 0.02f;
-    if (state->volume > 1.26f) state->volume = 1.26f;
-  }
-}
-
-inline void volume_decrease(TomuStatus *state){
-  WITH_LOCK(state->lock) {
-    state->volume -= 0.02f;
-    if (state->volume < 0.00f) state->volume = 0.00f;
-  }
-}
-
 // loop toggle
-inline void loop_toggle(TomuStatus *state){
-  state->looping = !state->looping;
-}
+// inline void loop_toggle(TomuStatus *state){
+//   state->looping = !state->looping;
+// }
 
 // shuffle toggle
 void shuffle_toggle(TomuStatus *state) {

@@ -6,10 +6,7 @@
 void playback_toggle(TomuStatus *state);
 void playback_stop(TomuStatus *state);
 
-void seek_forward_sec(TomuStatus *state);
-void seek_forward_min(TomuStatus *state);
-void seek_backward_sec(TomuStatus *state);
-void seek_backward_min(TomuStatus *state);
+void seek_playback(TomuStatus *state, dbus_int64_t offset);
 
 void playback_speed_defualt(TomuStatus *state);
 void playback_speed_increase(TomuStatus *state);
