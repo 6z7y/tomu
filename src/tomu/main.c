@@ -15,14 +15,14 @@ PlayBackContext tctx = {0};
 
 int main(int argc, char **argv)
 {
-  signal(SIGINT, sig_clean);
-  signal(SIGPIPE, SIG_IGN);
+  signal(SIGINT, signal_handle);
+  signal(SIGTERM, signal_handle);
+  // signal(SIGPIPE, SIG_IGN);
 
-  if (argc > 1) {
-      if (args_handle(argv[argc - 1])) {
-          if (!tctx.playback_active) exit(0);
-      }
-  }
+  char *option = argv[1];
+  char *src = argv[argc-1];
+
+  if (argc > 1) args_handle(option, src);
 
   first_init();
 
