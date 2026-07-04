@@ -10,8 +10,12 @@
 #include <time.h>
 
 #include "streaming.h"
+#include "macros.h"
 #include "structs.h"
 #include "file_handle.h"
+#include "audio_backend.h"
+#include "backend_utils.h"
+#include "mpris.h"
 
 #define DEBUG_STREAMING 1
 
@@ -20,6 +24,14 @@
 #else
 #define STREAM_DEBUG(fmt, ...)
 #endif
+
+CURL *curl = &tctx.stream_ctx.curl;
+
+const char *is_direct[] = {
+  ".mp3", ".ogg", ".opus", ".m4a",
+  ".flac", ".wav", ".webm", "googlevideo.com", 
+  "cf-hls", "sndcdn.com/media"
+};
 
 // AVIO callbacks
 int avio_read_packet(void *opaque, uint8_t *buf, int want) {
@@ -165,27 +177,17 @@ static void *curl_thread_fn(void *arg) {
 
 
 /*
- * Detect if a URL is a YouTube playlist.
- * Returns 1 if it contains "list=" and is not a single video (&v= without list context).
- */
-static int is_playlist_url(const char *url)
-{
-    return strstr(url, "list=") != NULL;
-}
-
-/*
  * Expand a playlist URL into the queue.
  * Calls yt-dlp to get all audio URLs and adds each one via queue_add().
  * Returns number of entries added, -1 on error.
  */
-int resolve_playlist(const char *url)
-{
-    printf("[playlist] Expanding: %s\n", url);
 
+int extract_playlist_url(const char *url)
+{
     char cmd[4096];
     snprintf(cmd, sizeof(cmd),
         "yt-dlp --flat-playlist --print url \"%s\" 2>/dev/null",
-        url);
+      url);
 
     FILE *fp = popen(cmd, "r");
     if (!fp) {
@@ -194,7 +196,7 @@ int resolve_playlist(const char *url)
     }
 
     int count = 0;
-    char line[8192];
+    char line[256];
     while (fgets(line, sizeof(line), fp)) {
         // strip newline
         size_t len = strlen(line);
@@ -204,7 +206,7 @@ int resolve_playlist(const char *url)
         if (len == 0) continue;
 
         printf("[playlist] +%d: %s\n", count + 1, line);
-        queue_add(line);
+        queue_add(line, SRC_URL_RAW);
         count++;
     }
     pclose(fp);
@@ -214,53 +216,48 @@ int resolve_playlist(const char *url)
 }
 
 // Resolve URL using yt-dlp
-// Resolve URL using yt-dlp - FIXED
 char *resolve_url(const char *url) {
-    int is_direct = (strstr(url, ".mp3") || strstr(url, ".ogg") ||
-                     strstr(url, ".opus") || strstr(url, ".m4a") ||
-                     strstr(url, ".flac") || strstr(url, ".wav") ||
-                     strstr(url, ".webm") || strstr(url, "googlevideo.com") ||
-                     strstr(url, "cf-hls") || strstr(url, "sndcdn.com/media"));
     
-    if (is_direct) {
-        printf("[url] direct audio URL detected\n");
-        return strdup(url);
+  // checking from direct url
+  for_each_arr(is_direct) {
+    if (strstr(is_direct[i], url)) {
+      printf("[url] direct audio URL detected\n");
+      return strdup(url);
     }
+  }
     
-    printf("[url] not a direct audio URL — trying yt-dlp\n");
-    
-    // Try to get best audio URL
-    char cmd[4096];
-    snprintf(cmd, sizeof(cmd),
-             "yt-dlp -f bestaudio/best --no-playlist -g \"%s\" 2>/dev/null | head -1",
-             url);
-    
-    printf("[yt-dlp] Running: %s\n", cmd);
-    FILE *fp = popen(cmd, "r");
-    if (!fp) {
-        fprintf(stderr, "[yt-dlp] popen failed\n");
-        return strdup(url);
-    }
-    
-    char resolved[8192] = {0};
-    if (!fgets(resolved, sizeof(resolved), fp)) {
-        fprintf(stderr, "[yt-dlp] no output - is yt-dlp installed?\n");
-        pclose(fp);
-        return strdup(url);
-    }
-    pclose(fp);
-    
-    size_t len = strlen(resolved);
-    while (len > 0 && (resolved[len-1] == '\n' || resolved[len-1] == '\r'))
-        resolved[--len] = '\0';
-    
-    if (len == 0) {
-        fprintf(stderr, "[yt-dlp] empty result\n");
-        return strdup(url);
-    }
-    
-    printf("[yt-dlp] resolved → %s\n", resolved);
-    return strdup(resolved);
+  // Try to get best audio URL
+  char cmd[4096];
+  snprintf(cmd, sizeof(cmd),
+           "yt-dlp -f bestaudio/best --no-playlist -g \"%s\" 2>/dev/null | head -1",
+           url);
+  
+  printf("[yt-dlp] Running: %s\n", cmd);
+  FILE *fp = popen(cmd, "r");
+  if (!fp) {
+      fprintf(stderr, "[yt-dlp] popen failed\n");
+      return strdup(url);
+  }
+  
+  char resolved[8192] = {0};
+  if (!fgets(resolved, sizeof(resolved), fp)) {
+      fprintf(stderr, "[yt-dlp] no output - is yt-dlp installed?\n");
+      pclose(fp);
+      return strdup(url);
+  }
+  pclose(fp);
+  
+  size_t len = strlen(resolved);
+  while (len > 0 && (resolved[len-1] == '\n' || resolved[len-1] == '\r'))
+      resolved[--len] = '\0';
+  
+  if (len == 0) {
+      fprintf(stderr, "[yt-dlp] empty result\n");
+      return strdup(url);
+  }
+  
+  printf("[yt-dlp] resolved → %s\n", resolved);
+  return strdup(resolved);
 }
 
 // Sanitize filename - remove invalid characters
@@ -405,49 +402,46 @@ void download_thumbnail(const char *url) {
 }
 
 // Initialize streaming context
-int streaming_init(PlayBackContext *ctx) {
-    memset(&ctx->stream_ctx, 0, sizeof(StreamContext));
-    ctx->stream_ctx.is_streaming = 0;
-    ctx->stream_ctx.streaming_active = 0;
-    ctx->stream_ctx.stream_buf = NULL;
+int streaming_init_zero(StreamContext *stream) {
+    memset(stream, 0, sizeof(StreamContext));
+    stream->is_streaming = 0;
+    stream->streaming_active = 0;
+    stream->stream_buf = NULL;
     return 0;
 }
 
 // Cleanup streaming resources
-void streaming_cleanup(PlayBackContext *ctx) {
-    if (!ctx) return;
+void streaming_cleanup(StreamContext *stream) {
+    if (!stream) return;
     
-    if (ctx->stream_ctx.stream_buf) {
-        StreamBuf *sb = (StreamBuf *)ctx->stream_ctx.stream_buf;
+    if (stream->stream_buf) {
+        StreamBuf *sb = (StreamBuf *)stream->stream_buf;
         if (sb->data) {
             free(sb->data);
-            sb->data = NULL;
         }
         pthread_mutex_destroy(&sb->lock);
         pthread_cond_destroy(&sb->more_data);
         free(sb);
-        ctx->stream_ctx.stream_buf = NULL;
+        stream->stream_buf = NULL;
     }
     
-    if (ctx->stream_ctx.stream_url) {
-        free(ctx->stream_ctx.stream_url);
-        ctx->stream_ctx.stream_url = NULL;
+    if (stream->stream_url) {
+        free(stream->stream_url);
+        stream->stream_url = NULL;
     }
     
-    if (ctx->stream_ctx.original_url) {
-        free(ctx->stream_ctx.original_url);
-        ctx->stream_ctx.original_url = NULL;
+    if (stream->original_url) {
+        free(stream->original_url);
+        stream->original_url = NULL;
     }
     
-    ctx->stream_ctx.is_streaming = 0;
-    ctx->stream_ctx.streaming_active = 0;
+    stream->is_streaming = 0;
+    stream->streaming_active = 0;
 }
 
 // Start streaming from URL
 int streaming_start(PlayBackContext *ctx, const char *url) {
-    if (!url) return -1;
-    
-    streaming_cleanup(ctx);
+    streaming_cleanup(&tctx.stream_ctx);
     
     char *stream_url = resolve_url(url);
     if (!stream_url) {
@@ -483,7 +477,7 @@ int streaming_start(PlayBackContext *ctx, const char *url) {
     
     CurlArgs *ca = malloc(sizeof(CurlArgs));
     if (!ca) {
-        streaming_cleanup(ctx);
+        streaming_cleanup(&tctx.stream_ctx);
         return -1;
     }
     
@@ -493,10 +487,10 @@ int streaming_start(PlayBackContext *ctx, const char *url) {
     
     if (pthread_create(&ctx->stream_ctx.stream_thread, NULL, curl_thread_fn, ca) != 0) {
         free(ca);
-        streaming_cleanup(ctx);
+        streaming_cleanup(&tctx.stream_ctx);
         return -1;
     }
-    pthread_detach(ctx->stream_ctx.stream_thread);
+    pthread_join(ctx->stream_ctx.stream_thread, NULL);
     
     printf("[stream] Started streaming from: %s\n", url);
     return 0;
@@ -516,7 +510,7 @@ void streaming_stop(PlayBackContext *ctx) {
         pthread_mutex_unlock(&sb->lock);
     }
     
-    streaming_cleanup(ctx);
+    streaming_cleanup(&tctx.stream_ctx);
     printf("[stream] Stopped streaming\n");
 }
 
@@ -527,9 +521,7 @@ int streaming_is_active(PlayBackContext *ctx) {
 
 // Initialize streaming playback
 int streaming_init_playback(PlayBackContext *ctx, const char *filename) {
-    if (!ctx || !filename) return -1;
-    
-    streaming_init(ctx);
+    streaming_init_zero(&tctx.stream_ctx); // zero
     if (streaming_start(ctx, filename) < 0) {
         fprintf(stderr, "Failed to start streaming\n");
         return -1;
@@ -606,3 +598,4 @@ int streaming_init_playback(PlayBackContext *ctx, const char *filename) {
     
     return 0;
 }
+

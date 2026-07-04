@@ -7,11 +7,11 @@
 #include "structs.h"
 
 // Initialize streaming context
-int streaming_init(PlayBackContext *ctx);
+int streaming_init(StreamContext *stream);
 
 // Resolve URL using yt-dlp
 char *resolve_url(const char *url);
-int resolve_playlist(const char *url);
+int extract_playlist_url(const char *url);
 
 // Start streaming from URL
 int streaming_start(PlayBackContext *ctx, const char *url);
@@ -29,7 +29,7 @@ int64_t avio_seek_packet(void *opaque, int64_t offset, int whence);
 // Initialize streaming playback (sets up fmtCTX with AVIO)
 int streaming_init_playback(PlayBackContext *ctx, const char *filename);
 
-void streaming_cleanup(PlayBackContext *ctx);
+void streaming_cleanup(StreamContext *stream);
 
 // Extract metadata from URL
 int extract_metadata_from_url(const char *url, Audio_Metadata *metadata);
