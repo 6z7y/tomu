@@ -2,30 +2,23 @@
 #include <signal.h>
 #include <poll.h>
 #include <dbus/dbus.h>
-#include <stdio.h>
 #include <curl/curl.h>
 
-#include "macros.h"
-#include "structs.h"
 #include "args.h"
-#include "mpris.h"
+#include "errors.h"
+#include "player.h"
+#include "structs.h"
 #include "utils.h"
 
 PlayBackContext tctx = {0};
 
 int main(int argc, char **argv)
 {
-  signal(SIGINT, signal_handle);
-  signal(SIGTERM, signal_handle);
-  // signal(SIGPIPE, SIG_IGN);
+  if (signal(SIGINT, signal_handle) == SIG_ERR) die("signal SIGINT");
+  if (signal(SIGTERM, signal_handle) == SIG_ERR) die("signal SIGTERM");
 
-  char *option = argv[1];
-  char *src = argv[argc-1];
-
-  if (argc > 1) args_handle(option, src);
+  if (argc > 1) args_handle(argc, argv);
 
   first_init();
-
-  // Main loop - handles D-Bus events and keeps the program running
-  mpris_loop();
+  playback_handle();
 }

@@ -1,0 +1,330 @@
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "../../libs/miniaudio.h"
+#include "output.h"
+#include "errors.h"
+#include "macros.h"
+#include "mpris.h"
+#include "structs.h"
+#include "utils.h"
+
+enum AVSampleFormat get_interleaved(enum AVSampleFormat value)
+{
+  switch (value) {
+    case AV_SAMPLE_FMT_DBLP: return AV_SAMPLE_FMT_DBL;
+    case AV_SAMPLE_FMT_FLTP: return AV_SAMPLE_FMT_FLT;
+    case AV_SAMPLE_FMT_S64P: return AV_SAMPLE_FMT_S64;
+    case AV_SAMPLE_FMT_S32P: return AV_SAMPLE_FMT_S32;
+    case AV_SAMPLE_FMT_S16P: return AV_SAMPLE_FMT_S16;
+    case AV_SAMPLE_FMT_U8P:  return AV_SAMPLE_FMT_U8;
+    default:                 return AV_SAMPLE_FMT_S16;
+  }
+}
+
+ma_format get_ma_format(enum AVSampleFormat value)
+{
+  switch (value) {
+    case AV_SAMPLE_FMT_DBL: return ma_format_f32;
+    case AV_SAMPLE_FMT_FLT: return ma_format_f32;
+    case AV_SAMPLE_FMT_S64: return ma_format_s32;
+    case AV_SAMPLE_FMT_S32: return ma_format_s32;
+    case AV_SAMPLE_FMT_S16: return ma_format_s16;
+    case AV_SAMPLE_FMT_U8:  return ma_format_u8;
+    default:                return ma_format_s16;
+  }
+}
+
+static void extract_title_from_path(const char *filename)
+{
+  const char *point = strrchr(filename, '/');
+  const char *base = point ? point + 1 : filename;
+
+  char title[256];
+  strncpy(title, base, sizeof(title) - 1);
+  title[sizeof(title) - 1] = '\0';
+
+  char *dot = strrchr(title, '.');
+  if (dot) *dot = '\0';
+
+  strncpy(tctx.state.metadata.title, title, sizeof(tctx.state.metadata.title) - 1);
+  tctx.state.metadata.title[sizeof(tctx.state.metadata.title) - 1] = '\0';
+}
+
+static void store_information(AVFormatContext *fmtCTX, AVCodecContext *decoderCTX, int audioStream_index, const char *filename)
+{
+  Audio_Info *inf = &tctx.inf;
+  extract_title_from_path(filename);
+
+  inf->audioStream_index = audioStream_index;
+  inf->audioStream = fmtCTX->streams[audioStream_index];
+
+  #ifdef LEGACY_LIBSWRSAMPLE
+    inf->ch        = decoderCTX->channels;
+    inf->ch_layout = decoderCTX->channel_layout;
+  #else
+    inf->ch        = decoderCTX->ch_layout.nb_channels;
+    inf->ch_layout = decoderCTX->ch_layout;
+  #endif
+
+  enum AVSampleFormat sample_fmt = decoderCTX->sample_fmt;
+  if (av_sample_fmt_is_planar(sample_fmt))
+    sample_fmt = get_interleaved(sample_fmt);
+
+  inf->sample_fmt = sample_fmt;
+  inf->sample_fmt_bytes = av_get_bytes_per_sample(sample_fmt);
+  inf->sample_rate = decoderCTX->sample_rate;
+  inf->ma_fmt = get_ma_format(sample_fmt);
+}
+
+int get_audioStream(AVFormatContext *fmtCTX)
+{
+  for (unsigned int i = 0; i < fmtCTX->nb_streams; i++) {
+    AVStream *stream = fmtCTX->streams[i];
+    if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+      return i;
+  }
+  return -1;
+}
+
+int get_audio_info(const char *filename)
+{
+  AVFormatContext *fmtCTX = NULL;
+  AVCodecContext  *decoderCTX = NULL;
+
+  if (avformat_open_input(&fmtCTX, filename, NULL, NULL) < 0)
+    return warn("ffmpeg: can't read audio source");
+
+  if (avformat_find_stream_info(fmtCTX, NULL) < 0) {
+    avformat_close_input(&fmtCTX);
+    return warn("ffmpeg: cannot find stream info");
+  }
+
+  int audioStream_index = get_audioStream(fmtCTX);
+  if (audioStream_index < 0) {
+    avformat_close_input(&fmtCTX);
+    return warn("can't find audioStream");
+  }
+
+  const AVCodecParameters *codecPAR = fmtCTX->streams[audioStream_index]->codecpar;
+
+  AVCodec *codecid = avcodec_find_decoder(codecPAR->codec_id);
+  if (!codecid) {
+    avformat_close_input(&fmtCTX);
+    return warn("ffmpeg: unsupported codec id %d", codecPAR->codec_id);
+  }
+
+  decoderCTX = avcodec_alloc_context3(codecid);
+  if (!decoderCTX) {
+    avformat_close_input(&fmtCTX);
+    return warn("ffmpeg: failed allocate codec!");
+  }
+
+  avcodec_parameters_to_context(decoderCTX, codecPAR);
+
+  if (avcodec_open2(decoderCTX, codecid, NULL) < 0) {
+    avformat_close_input(&fmtCTX);
+    avcodec_free_context(&decoderCTX);
+    return warn("ffmpeg: cannot open codec!");
+  }
+
+  store_information(fmtCTX, decoderCTX, audioStream_index, filename);
+  mpris_notify_change();
+
+  tctx.fmtCTX = fmtCTX;
+  tctx.decoderCTX = decoderCTX;
+
+  return 0;
+}
+
+int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
+{
+  #ifdef LEGACY_LIBSWRSAMPLE
+    *swrCTX = swr_alloc_set_opts(*swrCTX,
+      inf->ch_layout, inf->sample_fmt, inf->sample_rate,
+      inf->ch_layout, tctx.decoderCTX->sample_fmt, inf->sample_rate,
+      0, NULL
+    );
+  #else
+    swr_alloc_set_opts2(swrCTX,
+      &inf->ch_layout, inf->sample_fmt, inf->sample_rate,
+      &inf->ch_layout, tctx.decoderCTX->sample_fmt, inf->sample_rate,
+      0, NULL
+    );
+  #endif
+
+  return 1;
+}
+
+void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX)
+{
+  int new_rate = (int)(inf->sample_rate / tctx.state.speed);
+  enum AVSampleFormat input_fmt = frame->format;
+  enum AVSampleFormat output_fmt = inf->sample_fmt;
+
+  #ifdef LEGACY_LIBSWRSAMPLE
+    uint64_t ch_layout_in = tctx.decoderCTX->channel_layout;
+    if (ch_layout_in == 0)
+      ch_layout_in = av_get_default_channel_layout(tctx.decoderCTX->channels);
+
+    *speed_swrCTX = swr_alloc_set_opts(NULL,
+      ch_layout_in, output_fmt, new_rate,
+      ch_layout_in, input_fmt, inf->sample_rate,
+      0, NULL
+    );
+  #else
+    AVChannelLayout layout;
+    av_channel_layout_default(&layout, inf->ch);
+
+    swr_alloc_set_opts2(speed_swrCTX,
+      &layout, output_fmt, new_rate,
+      &layout, input_fmt, inf->sample_rate,
+      0, NULL
+    );
+    av_channel_layout_uninit(&layout);
+  #endif
+
+  if (*speed_swrCTX && swr_init(*speed_swrCTX) < 0)
+    swr_free(speed_swrCTX);
+}
+
+void init_playbackstatus(PlaybackStatus *state)
+{
+  state->running = 1;
+  state->paused = 0;
+  state->seek_request = 0;
+  state->seek_target = 0;
+  // state->loop = loop;
+  // state->shuffle = shuffle;
+  state->volume = 1.0f;
+  state->speed = 1.0f;
+  state->position = 0;
+  state->duration = 0;
+  state->skip_to_next = 0;
+}
+
+void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
+{
+  Audio_Info *inf = &tctx.inf;
+  PlaybackStatus *state = &tctx.state;
+  AVFormatContext *fmtCTX = tctx.fmtCTX;
+  AVCodecContext *codecCTX = tctx.decoderCTX;
+
+  double current_sec = (double)*total_samples_played / inf->sample_rate;
+  double new_position_seconds = current_sec + ((double)state->seek_target / 1000000);
+
+  if (new_position_seconds < 0) new_position_seconds = 0;
+  if (new_position_seconds > *duration_time) new_position_seconds = *duration_time;
+
+  int64_t target_pts = (int64_t)(new_position_seconds / av_q2d(inf->audioStream->time_base));
+
+  av_seek_frame(fmtCTX, inf->audioStream_index, target_pts, AVSEEK_FLAG_BACKWARD);
+  avcodec_flush_buffers(codecCTX);
+
+  *total_samples_played = (int64_t)(new_position_seconds * inf->sample_rate);
+
+  audio_buffer_reset();
+
+  state->seek_request = 0;
+  state->seek_target = 0;
+}
+
+static void apply_metadata_dict(Audio_Metadata *m, AVDictionary *dict)
+{
+  AVDictionaryEntry *tag = NULL;
+  while ((tag = av_dict_get(dict, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+    if      (!strcmp(tag->key, "artist"))       strncpy(m->artist,       tag->value, sizeof(m->artist)       - 1);
+    else if (!strcmp(tag->key, "album"))        strncpy(m->album,        tag->value, sizeof(m->album)        - 1);
+    else if (!strcmp(tag->key, "album_artist")) strncpy(m->album_artist, tag->value, sizeof(m->album_artist) - 1);
+    else if (!strcmp(tag->key, "genre"))        strncpy(m->genre,        tag->value, sizeof(m->genre)        - 1);
+    else if (!strcmp(tag->key, "composer"))     strncpy(m->composer,     tag->value, sizeof(m->composer)     - 1);
+    else if (!strcmp(tag->key, "disc"))         strncpy(m->disc,         tag->value, sizeof(m->disc)         - 1);
+    else if (!strcmp(tag->key, "date"))         strncpy(m->date,         tag->value, sizeof(m->date)         - 1);
+    else if (!strcmp(tag->key, "track"))        strncpy(m->track,        tag->value, sizeof(m->track)        - 1);
+  }
+}
+
+void get_metadata(const char *filename)
+{
+  Audio_Metadata *m = &tctx.state.metadata;
+
+  apply_metadata_dict(m, tctx.fmtCTX->metadata);
+  int idx = tctx.inf.audioStream_index;
+  if (idx >= 0 && (unsigned)idx < tctx.fmtCTX->nb_streams)
+    apply_metadata_dict(m, tctx.fmtCTX->streams[idx]->metadata);
+
+  if (!m->title[0]) {
+    if (filename && strlen(filename) > 0) {
+      extract_title_from_path(filename);
+    } else if (tctx.stream_ctx.is_streaming) {
+      // if (tctx.stream_ctx.original_url) {
+      //   const char *base = strrchr(tctx.stream_ctx.original_url, '/');
+      //   if (base) {
+      //     base = base + 1;
+      //     char *clean = strdup(base);
+      //     char *q = strchr(clean, '?');
+      //     if (q) *q = '\0';
+      //     strncpy(m->title, clean, sizeof(m->title) - 1);
+      //     free(clean);
+      //   }
+      // }
+      if (!m->title[0])
+        strncpy(m->title, "Stream", sizeof(m->title) - 1);
+    }
+  }
+
+  m->title[sizeof(m->title) - 1] = '\0';
+  m->artist[sizeof(m->artist) - 1] = '\0';
+  m->album[sizeof(m->album) - 1] = '\0';
+  m->album_artist[sizeof(m->album_artist) - 1] = '\0';
+  m->genre[sizeof(m->genre) - 1] = '\0';
+  m->date[sizeof(m->date) - 1] = '\0';
+  m->track[sizeof(m->track) - 1] = '\0';
+}
+
+// fn for extract cover img from file audio
+//
+// returns:
+// 0 = success
+// -1 = failed, or something happend
+int extract_cover(AVFormatContext *fmt)
+{
+  if (run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null") < 0) warn("can't init tomu_cover_img folder!"); return -1;
+
+  char *output_path = format("/tmp/tomu_cover_img/%s.jpg", tctx.state.metadata.title);
+
+  for (unsigned int i = 0; i < fmt->nb_streams; i++) {
+    AVStream *stream = fmt->streams[i];
+    if (!stream) continue;
+
+    if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+      AVPacket pkt = stream->attached_pic;
+      if (pkt.data == NULL || pkt.size == 0) continue;
+
+      FILE *f = fopen(output_path, "wb");
+      if (!f) {
+        fprintf(stderr, "tomu: Could not create output file '%s'\n", output_path);
+        return 1;
+      }
+
+      size_t written = fwrite(pkt.data, 1, pkt.size, f);
+      fclose(f);
+
+      if (written != (size_t)pkt.size) {
+        fprintf(stderr, "[cover] Only wrote %zu of %d bytes\n", written, pkt.size);
+        return 1;
+      }
+
+      char uri[512];
+      snprintf(uri, sizeof(uri), "file://%s", output_path);
+      strncpy(tctx.state.metadata.cover_path, uri, sizeof(tctx.state.metadata.cover_path) - 1);
+
+      return 0;
+    }
+  }
+
+  return -1;
+}
