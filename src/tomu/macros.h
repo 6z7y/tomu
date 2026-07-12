@@ -6,7 +6,7 @@
 
 // program info
 #define TOMU_NAME "tomu"
-#define TOMU_VER "1.3.6"
+#define TOMU_VER "1.3.7"
 
 // D-Bus settings
 #define BUS_NAME    "org.mpris.MediaPlayer2.tomu"
