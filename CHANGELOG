@@ -1,4 +1,12 @@
-# 6z7y 1.3.6-beta - 2026-07-5
+# 6z7y 1.3.7-beta - 2026-07-12
+- fix skip last playback will frezing
+- rename files src
+- fix hearing last pieces of pcm
+- change threading from playback_handle to mpris and locally in playback_handle
+- add arg_match.h"
+- support history
+
+# 6z7y 1.3.6-beta - 2026-07-05
 - simplify Makefile and improve it with output
 - add 'make update' to update the repository
 - add loop modes (none, track, playlist)
