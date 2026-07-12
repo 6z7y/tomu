@@ -1,5 +1,5 @@
-#ifndef APP_MACROS_H
-#define APP_MACROS_H
+#ifndef MACROS_H
+#define MACROS_H
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -29,8 +29,8 @@
 // checking from msg if url or path
 #define IS_PATH_DIR(arg) ({ struct stat _st; (stat((arg), &_st) == 0) && S_ISDIR(_st.st_mode); }) //1=dir, 0=not_dir
 #define IS_PATH_RAW(arg) ({ struct stat _st; (stat((arg), &_st) == 0) && S_ISREG(_st.st_mode); }) //1=file, 0=not_file
-#define IS_URL_PLAYLIST(arg) (strstr((arg), "list=") != NULL) //1=url, 0=not_url
 #define IS_URL_RAW(arg) ((!strncmp((arg), "http://", 7)) || (!strncmp((arg), "https://", 8))) //1=url, 0=not_url
+#define IS_URL_PLAYLIST(arg) (IS_URL_RAW(arg) && strstr((arg), "list=") != NULL) //1=url_playlist, 0=not
 
 // block of pthread_mutex lock/unlock
 #define WITH_LOCK(mutex) for (int _once = (pthread_mutex_lock(&(mutex)), 1); _once; _once = (pthread_mutex_unlock(&(mutex)), 0)) // pthread mutex
