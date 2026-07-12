@@ -2,52 +2,61 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "../../libs/arg_match.h"
 #include "errors.h"
-#include "file_handle.h"
+#include "playlist.h"
 #include "macros.h"
 #include "structs.h"
-#include "utils.h"
-
-// arg compare opts
-const char *help_opts[] = {"--help", "help", "-h", NULL};       // help
-const char *ver_opts[]  = {"--version", "version", "-v", NULL}; // version
 
 void help()
 {
   printf(
-      "Usage: tomu [OPTIONS] [FILE|URL]\n\n"
-      "Options:\n"
-      "  -h, --help      Show this help message\n"
-      "  -v, --version   Show version information\n\n"
-      "Examples:\n"
-      "  tomu song.mp3                    Play a local file\n"
-      "  tomu /path/to/music/             Play all music in directory\n"
-      "  tomu https://youtu.be/abc123     Play a YouTube URL\n"
-      "  tomu https://soundcloud.com/...  Play a SoundCloud URL\n"
-      "  tomu https://example.com/audio.mp3 Play a direct audio URL\n"
+    "usage: tomu [options] [file|url]\n\n"
+    "options:\n"
+    "  -h, --help          show this help message\n"
+    "  -v, --version       show version information\n"
+    "  --shuffle           enable shuffle\n"
+    "  --no-shuffle        disable shuffle\n"
+    "  --loop none|track|playlist  set loop mode\n\n"
+    "examples:\n"
+    "  tomu song.mp3\n"
+    "  tomu /path/to/music/\n"
+    "  tomu --shuffle --loop playlist /path/to/music/\n"
+    "  tomu https://youtu.be/abc123\n"
   );
 }
 
-int match_opt(const char *arg, const char **opts)
+void args_handle(int argc, char **argv)
 {
-  for (int i=0; opts[i]; i++)
-      if (!strcmp(arg, opts[i])) return 1;
+  const char *loop_opts[]     = {"--loop", "loop", "-l", NULL};
+  const char *shuffle_opts[]  = {"--shuffle", "shuffle", "-s", NULL};
+  const char *loop_vals[]     = {"none", "track", "playlist", NULL};
+  const char *help_opts[]     = {"--help", "help", "-h", NULL};
+  const char *ver_opts[]      = {"--version", "version", "-v", NULL};
 
-  return 0;
-}
+  tctx.state.shuffle = 0;
+  tctx.state.loop = LOOP_NONE;
+  tctx.list.filter_files = 1;
 
-// handle command-line arguments
-void args_handle(const char *option, const char *src)
-{
-  int result_src_checking = handle_src(src);
-  if (result_src_checking > 0) return;
+  for (int i = 1; i < argc; i++) {
+    if (arg_check_opts(argc, argv, loop_opts)) {
+      switch(arg_match_opts_with_values(&argc, argv, loop_opts, loop_vals)) {
+        case 0: tctx.state.loop = LOOP_NONE; break;
+        case 1: tctx.state.loop = LOOP_TRACK; break;
+        case 2: tctx.state.loop = LOOP_PLAYLIST; break;
+        case -1: die("tomu: unknown loop mode '%s' try (none|track|playlist)", argv[i+1]); break;
+        default: tctx.state.loop = LOOP_NONE;
+      }
+    }
+    if (arg_match_opts(&argc, argv, shuffle_opts) == 1) tctx.state.shuffle = 1;
+    if (arg_match_opt(&argc, argv, "--no-filter") == 1) tctx.list.filter_files = 0;
+    if (arg_match_opts(&argc, argv, help_opts) == 1) { help(); exit(0); }
+    if (arg_match_opts(&argc, argv, ver_opts) == 1)  { printf("tomu: %s\n", TOMU_VER); exit(0); }
+  }
 
-  else if (match_opt(option, help_opts)) help();
+  const char *src = argv[1];
 
-  else if (match_opt(option, ver_opts)) printf("tomu: %s\n", TOMU_VER);
-
-  else 
-    warn("tomu: unknown option '%s'\n  try '%s --help'", option, TOMU_NAME);
-
-  exit(0);
+  if (src) {
+    if (src_handle(src) < 0) die("invalid '%s':", src);
+  }
 }
