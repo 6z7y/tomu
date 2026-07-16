@@ -292,37 +292,39 @@ void get_metadata(const char *filename)
 // -1 = failed, or something happend
 int extract_cover(AVFormatContext *fmt)
 {
-  if (run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null") < 0) warn("can't init tomu_cover_img folder!"); return -1;
+  run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
 
   char *output_path = format("/tmp/tomu_cover_img/%s.jpg", tctx.state.metadata.title);
+  printf("optupt: %s\n", output_path);
 
   for (unsigned int i = 0; i < fmt->nb_streams; i++) {
     AVStream *stream = fmt->streams[i];
     if (!stream) continue;
 
-    if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-      AVPacket pkt = stream->attached_pic;
-      if (pkt.data == NULL || pkt.size == 0) continue;
 
-      FILE *f = fopen(output_path, "wb");
-      if (!f) {
-        fprintf(stderr, "tomu: Could not create output file '%s'\n", output_path);
-        return 1;
-      }
+    for (unsigned int i = 0; i < fmt->nb_streams; i++) {
+        AVStream *stream = fmt->streams[i];
 
-      size_t written = fwrite(pkt.data, 1, pkt.size, f);
-      fclose(f);
+        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+            AVPacket pkt = stream->attached_pic;
 
-      if (written != (size_t)pkt.size) {
-        fprintf(stderr, "[cover] Only wrote %zu of %d bytes\n", written, pkt.size);
-        return 1;
-      }
+            FILE *f = fopen(output_path, "wb");
+            if (!f) {
+                printf("Could not create output file: %s\n", output_path);
+                return 1;
+            }
 
-      char uri[512];
-      snprintf(uri, sizeof(uri), "file://%s", output_path);
-      strncpy(tctx.state.metadata.cover_path, uri, sizeof(tctx.state.metadata.cover_path) - 1);
+            fwrite(pkt.data, 1, pkt.size, f);
+            fclose(f);
 
-      return 0;
+            // printf("✅ Cover saved: %s\n", output_path);
+
+            strncpy(tctx.state.metadata.cover_path,
+                    output_path,
+                    sizeof(tctx.state.metadata.cover_path) - 1);
+
+            return 0;
+        }
     }
   }
 
