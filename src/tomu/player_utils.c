@@ -295,7 +295,6 @@ int extract_cover(AVFormatContext *fmt)
   run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
 
   char *output_path = format("/tmp/tomu_cover_img/%s.jpg", tctx.state.metadata.title);
-  printf("optupt: %s\n", output_path);
 
   for (unsigned int i = 0; i < fmt->nb_streams; i++) {
     AVStream *stream = fmt->streams[i];

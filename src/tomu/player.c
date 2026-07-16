@@ -44,7 +44,7 @@ void playback_handle()
     char *src = strdup(tctx.list.queue_lists[idx]);
 
     tctx.list.src_type = extract_src_type(src);
-    printf("is src type is %d\n", tctx.list.src_type);
+    // printf("is src type is %d\n", tctx.list.src_type);
     playback_run(src); // run now
 
     // if next
