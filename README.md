@@ -67,15 +67,13 @@ nix profile remove tomu
 
 ## How It Works
 
-Tomu uses a sophisticated multi-threaded architecture for smooth audio playback:
-
 ![Architecture Diagram](docs/diagram.png)
 
 1. Start with play: `tomu /path/to/music`
 
-**i made this tool for learn c and need music player less usage ram, tomu uses ram 24-30mb.**
-
-`this only beta not complete yet`
-
 Binaries
-- tomu — background server, handles decoding and playback
+- **tomu**: background server, handles decoding and playback
+- **[tomu-mpris](https://github.com/6z7y/tomu-mpris)**: exposes Tomu over the MPRIS D-Bus interface.
+
+**i made this tool for learn c and need music player less usage ram, tomu uses ram 24-30mb.**
+`this only beta not complete yet`
