@@ -8,16 +8,13 @@
 #define TOMU_NAME "tomu"
 #define TOMU_VER "1.3.7"
 
-// D-Bus settings
-#define BUS_NAME    "org.mpris.MediaPlayer2.tomu"
-#define OBJ_PATH    "/org/mpris/MediaPlayer2"
-#define IFACE_ROOT  "org.mpris.MediaPlayer2" // tomu
-#define IFACE_PLAYER "org.mpris.MediaPlayer2.Player" // control
-#define IFACE_PROPS "org.freedesktop.DBus.Properties" // write/read info
+
+#define STATE_FILE  "/tmp/tomu.inf"
+#define CMD_FILE    "/tmp/tomu.cmd"
 
 // Utils
-#define F_ALSE 0
-#define T_RUE 1
+#define true 1
+#define false 0
 
 // colors
 #define RED "\e[0;31m"
