@@ -11,6 +11,7 @@
 
 #include "structs.h"
 #include "player.h"
+#include "utils.h"
 
 #include "../../libs/miniaudio.h"
 
@@ -81,10 +82,11 @@ void audio_buffer_read(Audio_Buffer *buf, uint8_t *output, int bytes_needed)
 
 void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_uint32 frameCount)
 {
-  (void)ma_config; (void)input;
+  (void)input;
+  PlayBackContext *ctx = ma_config->pUserData; 
 
-  Audio_Info *inf = &tctx.inf;
-  PlaybackStatus *state = &tctx.state;
+  Audio_Info *inf = &ctx->inf;
+  PlaybackStatus *state = &ctx->state;
 
   pthread_mutex_lock(&state->lock);
   while (state->paused)
@@ -92,7 +94,7 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
   pthread_mutex_unlock(&state->lock);
 
   int bytes = frameCount * inf->ch * inf->sample_fmt_bytes;
-  audio_buffer_read(tctx.buf, output, bytes);
+  audio_buffer_read(ctx->buf, output, bytes);
 
   pthread_mutex_lock(&state->lock);
   if (state->volume != 1.00f)
@@ -100,15 +102,15 @@ void ma_dataCallback(ma_device *ma_config, void *output, const void *input, ma_u
   pthread_mutex_unlock(&state->lock);
 }
 
-ma_device_config init_miniaudioConfig(Audio_Info *inf)
+ma_device_config init_miniaudioConfig(PlayBackContext *ctx)
 {
   ma_device_config ma_config = ma_device_config_init(ma_device_type_playback);
 
-  ma_config.playback.channels = inf->ch;
-  ma_config.playback.format = inf->ma_fmt;
-  ma_config.sampleRate = inf->sample_rate;
+  ma_config.playback.channels = ctx->inf.ch;
+  ma_config.playback.format = ctx->inf.ma_fmt;
+  ma_config.sampleRate = ctx->inf.sample_rate;
   ma_config.dataCallback = ma_dataCallback;
-  ma_config.pUserData = &tctx;
+  ma_config.pUserData = ctx;
 
   return ma_config;
 }
@@ -132,14 +134,14 @@ Audio_Buffer *audio_buffer_init(int capacity)
   return buf;
 }
 
-void audio_buffer_reset()
+void audio_buffer_reset(PlayBackContext *ctx)
 {
-  pthread_mutex_lock(&tctx.buf->lock);
-  tctx.buf->filled = 0;
-  tctx.buf->read_pos = 0;
-  tctx.buf->write_pos = 0;
-  pthread_cond_broadcast(&tctx.buf->space_free);
-  pthread_mutex_unlock(&tctx.buf->lock);
+  pthread_mutex_lock(&ctx->buf->lock);
+  ctx->buf->filled = 0;
+  ctx->buf->read_pos = 0;
+  ctx->buf->write_pos = 0;
+  pthread_cond_broadcast(&ctx->buf->space_free);
+  pthread_mutex_unlock(&ctx->buf->lock);
 }
 
 void audio_buffer_destroy(Audio_Buffer *buf)
@@ -151,4 +153,29 @@ void audio_buffer_destroy(Audio_Buffer *buf)
   pthread_cond_destroy(&buf->data_ready);
   pthread_cond_destroy(&buf->space_free);
   free(buf);
+}
+
+void *miniaudio_start(void *arg)
+{
+  PlayBackContext *ctx = arg;
+
+  ma_device_config ma_config = init_miniaudioConfig(ctx);
+
+  if (ma_device_init(NULL, &ma_config, &ctx->buf->device) != MA_SUCCESS) {
+    fprintf(stderr, "[player] Failed to initialize miniaudio\n");
+    audio_buffer_destroy(ctx->buf);
+    ctx->buf = NULL;
+    cleanUP(ctx);
+    printf("problem in mini audio start\n");
+    exit(1); // for test if there problem
+  }
+
+  if (ma_device_start(&ctx->buf->device) != MA_SUCCESS) {
+    fprintf(stderr, "[player] Failed to start audio device\n");
+    ctx->state.running = 0;
+    ma_device_uninit(&ctx->buf->device);
+    audio_buffer_destroy(ctx->buf);
+  }
+
+  return NULL;
 }
