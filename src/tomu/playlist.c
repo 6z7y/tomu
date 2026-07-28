@@ -17,18 +17,18 @@ static const char *filter_fmts[] = {
   ".ogg", ".m4a", ".wav", ".wma"
 };
 
-static void add_to_list(LIST_FILES *queue, const char *src)
+static void add_to_list(PlayBackContext *ctx, LIST_FILES *queue, const char *src)
 {
-  pthread_mutex_lock(&tctx.list.pt_lock);
+  pthread_mutex_lock(&ctx->list.pt_lock);
 
   char **tmp = realloc(queue->queue_lists, sizeof(char *) * (queue->queue_count + 1));
-  if (!tmp) { pthread_mutex_unlock(&tctx.list.pt_lock); return; }
+  if (!tmp) { pthread_mutex_unlock(&ctx->list.pt_lock); return; }
   queue->queue_lists = tmp;
   queue->queue_lists[queue->queue_count] = strdup(src);
   queue->queue_count++;
 
-  pthread_cond_signal(&tctx.list.pt_signal);
-  pthread_mutex_unlock(&tctx.list.pt_lock);
+  pthread_cond_signal(&ctx->list.pt_signal);
+  pthread_mutex_unlock(&ctx->list.pt_lock);
 }
 
 SRC_TYPE extract_src_type(const char *src)
@@ -38,7 +38,7 @@ SRC_TYPE extract_src_type(const char *src)
   else return               SRC_NONE;
 }
 
-int src_handle(const char *src)
+int src_handle(PlayBackContext *ctx, const char *src)
 {
   // step 1 check format
   SRC_TYPE src_type;
@@ -52,11 +52,12 @@ int src_handle(const char *src)
   // step 2 run correct handle
   switch (src_type) {
     case SRC_NONE:         return -1;
-    case SRC_FILE_DIR: case SRC_FILE_RAW:     path_handle(src, &tctx.list); break;
-    case SRC_URL_PLAYLIST: extract_playlist_url(src); break;
-    case SRC_URL_RAW:      add_to_list(&tctx.list, src); break;
+    case SRC_FILE_DIR: case SRC_FILE_RAW:     path_handle(ctx, src, &ctx->list); break;
+    // case SRC_URL_PLAYLIST: extract_playlist_url(src); break;
+     case SRC_URL_PLAYLIST: exit(0); break; // test
+    case SRC_URL_RAW:      add_to_list(ctx, &ctx->list, src); break;
   }
-  tctx.list.src_type = src_type;
+  ctx->list.src_type = src_type;
   return 1;
 }
 
@@ -71,7 +72,7 @@ static int is_audio_fmt(const char *path)
   return 0;
 }
 
-void path_handle(const char *path, LIST_FILES *queue)
+void path_handle(PlayBackContext *ctx, const char *path, LIST_FILES *queue)
 {
   struct stat st;
   if (stat(path, &st) < 0) {
@@ -80,8 +81,8 @@ void path_handle(const char *path, LIST_FILES *queue)
   }
 
   if (S_ISREG(st.st_mode)) {
-    if (!tctx.list.filter_files || is_audio_fmt(path))
-      add_to_list(queue, path);
+    if (!ctx->list.filter_files || is_audio_fmt(path))
+      add_to_list(ctx, queue, path);
   } else if (S_ISDIR(st.st_mode)) {
     struct dirent *file;
     DIR *dir_path = opendir(path);
@@ -92,7 +93,7 @@ void path_handle(const char *path, LIST_FILES *queue)
 
       char buf[1024];
       snprintf(buf, sizeof(buf), "%s/%s", path, file->d_name);
-      path_handle(buf, queue);
+      path_handle(ctx, buf, queue);
     }
     closedir(dir_path);
   }
