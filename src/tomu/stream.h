@@ -18,5 +18,6 @@ int streaming_init_playback(PlayBackContext *ctx, const char *filename);
 void streaming_cleanup(StreamContext *stream);
 int get_metadata_from_url(const char *url, Audio_Metadata *metadata);
 void download_thumbnail(const char *url);
+void init_curl();
 
 #endif
