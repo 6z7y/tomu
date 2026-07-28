@@ -7,11 +7,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/inotify.h>
 
+#include "control.h"
 #include "macros.h"
 #include "structs.h"
 #include "errors.h"
-#include "mpris.h"
 #include "stream.h"
 
 char *format(const char *fmt, ...)
@@ -46,18 +47,16 @@ int run_command(char *cmd)
   return 0;
 }
 
-void cleanUP()
+void cleanUP(PlayBackContext *ctx)
 {
-  if (tctx.stream_ctx.is_streaming)
-    streaming_cleanup(&tctx.stream_ctx);
+  // if (ctx->stream_ctx.is_streaming)
+    // streaming_cleanup(ctx->stream_ctx);
 
-  if (tctx.fmtCTX) {
-    avformat_close_input(&tctx.fmtCTX);
-    tctx.fmtCTX = NULL;
+  if (ctx->fmtCTX) {
+    avformat_close_input(&ctx->fmtCTX);
   }
-  if (tctx.decoderCTX) {
-    avcodec_free_context(&tctx.decoderCTX);
-    tctx.decoderCTX = NULL;
+  if (ctx->decoderCTX) {
+    avcodec_free_context(&ctx->decoderCTX);
   }
 }
 
@@ -67,17 +66,84 @@ void signal_handle(int sig)
   _exit(0);
 }
 
-// first initilizeion
-void first_init()
+void *read_cmd(void *arg)
 {
-  mpris_init();
-  curl_global_init(CURL_GLOBAL_ALL);
+  PlayBackContext *ctx = arg;
+  char buf[2048];
+  char line[256];
 
-  pthread_mutex_init(&tctx.list.pt_lock, NULL);
-  pthread_cond_init(&tctx.list.pt_signal, NULL);
-  pthread_mutex_init(&tctx.state.lock, NULL);
-  pthread_cond_init(&tctx.state.wait_cond, NULL);
+  int fd = inotify_init();
+  if (fd < 0) {
+    die("inotify_init:");
+  }
 
-  pthread_create(&tctx.dbus_s.thread, NULL, mpris_loop, NULL);
-  pthread_detach(tctx.dbus_s.thread);
+  inotify_add_watch(fd, CMD_FILE, IN_CLOSE_WRITE);
+
+  while (true) {
+    ssize_t len = read(fd, &buf, sizeof(buf));
+    if (len < 0) {
+      warn("read:");
+      return NULL;
+    }
+
+    for (size_t i=0; i<len;) {
+      struct inotify_event *event = (struct inotify_event*)&buf[i];
+
+      if (event->mask & IN_CLOSE_WRITE) {
+        FILE *f = fopen(CMD_FILE, "r");
+
+        while(fgets(line, sizeof(line), f)) {
+          line[strcspn(line, "\n")] = '\0';
+          printf("line: '%s'\n", line);
+          if (!strcmp(line, "OPENURI")) {
+            printf("here\n");
+
+          };
+          if (!strcmp(line, "PLAYPAUSE")) playback_toggle(ctx);
+          if (!strcmp(line, "NEXT")) playback_next_audio(ctx);
+          if (!strcmp(line, "PREV")) playback_prev_audio(ctx);
+          if (!strncmp(line, "OPEN:", 5)) {
+            char *path = line + 5;
+          }
+        }
+        fclose(f);
+        truncate(CMD_FILE, 0);
+      }
+      i += sizeof(struct inotify_event) + event->len;
+    }
+  }
+}
+
+void write_inf(PlayBackContext *ctx)
+{
+  if (!ctx->state.running) return;
+
+  FILE *f = fopen(STATE_FILE, "w");
+  if (!f) return;
+
+  const char *status = ctx->state.paused ? "Paused" : "Playing";
+  const char *loop = "None";
+  if (ctx->state.loop == LOOP_TRACK)       loop = "Track";
+  else if (ctx->state.loop == LOOP_PLAYLIST) loop = "Playlist";
+
+  fprintf(f, "STATUS:%s\n", status);
+  fprintf(f, "ARTIST:%s\n", ctx->state.metadata.artist);
+  fprintf(f, "TITLE:%s\n", ctx->state.metadata.title);
+  fprintf(f, "ALBUM:%s\n", ctx->state.metadata.album);
+  fprintf(f, "ALBUM_ARTIST:%s\n", ctx->state.metadata.album_artist);
+  fprintf(f, "COMPOSER:%s\n", ctx->state.metadata.composer);
+  fprintf(f, "GENRE:%s\n", ctx->state.metadata.genre);
+  fprintf(f, "DATE:%s\n", ctx->state.metadata.date);
+  fprintf(f, "TRACK:%s\n", ctx->state.metadata.track);
+  fprintf(f, "DISC:%s\n", ctx->state.metadata.disc);
+  fprintf(f, "COVER:%s\n", ctx->state.metadata.cover_path);
+  fprintf(f, "URL:%s\n", ctx->state.metadata.url);
+  fprintf(f, "LOOP:%s\n", loop);
+  fprintf(f, "DURATION:%d\n", ctx->state.duration);
+  fprintf(f, "POSITION:%d\n", ctx->state.position);
+  fprintf(f, "VOLUME:%.2f\n", ctx->state.volume);
+  fprintf(f, "SPEED:%.2f\n", ctx->state.speed);
+  fprintf(f, "SHUFFLE:%d\n", ctx->state.shuffle);
+
+  fclose(f);
 }
