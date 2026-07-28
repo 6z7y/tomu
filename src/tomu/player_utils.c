@@ -8,7 +8,6 @@
 #include "output.h"
 #include "errors.h"
 #include "macros.h"
-#include "mpris.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -38,7 +37,7 @@ ma_format get_ma_format(enum AVSampleFormat value)
   }
 }
 
-static void extract_title_from_path(const char *filename)
+static void extract_title_from_path(PlayBackContext *ctx, const char *filename)
 {
   const char *point = strrchr(filename, '/');
   const char *base = point ? point + 1 : filename;
@@ -50,14 +49,14 @@ static void extract_title_from_path(const char *filename)
   char *dot = strrchr(title, '.');
   if (dot) *dot = '\0';
 
-  strncpy(tctx.state.metadata.title, title, sizeof(tctx.state.metadata.title) - 1);
-  tctx.state.metadata.title[sizeof(tctx.state.metadata.title) - 1] = '\0';
+  strncpy(ctx->state.metadata.title, title, sizeof(ctx->state.metadata.title) - 1);
+  ctx->state.metadata.title[sizeof(ctx->state.metadata.title) - 1] = '\0';
 }
 
-static void store_information(AVFormatContext *fmtCTX, AVCodecContext *decoderCTX, int audioStream_index, const char *filename)
+static void store_information(PlayBackContext *ctx, AVFormatContext *fmtCTX, AVCodecContext *decoderCTX, int audioStream_index, const char *filename)
 {
-  Audio_Info *inf = &tctx.inf;
-  extract_title_from_path(filename);
+  Audio_Info *inf = &ctx->inf;
+  extract_title_from_path(ctx, filename);
 
   inf->audioStream_index = audioStream_index;
   inf->audioStream = fmtCTX->streams[audioStream_index];
@@ -80,7 +79,7 @@ static void store_information(AVFormatContext *fmtCTX, AVCodecContext *decoderCT
   inf->ma_fmt = get_ma_format(sample_fmt);
 }
 
-int get_audioStream(AVFormatContext *fmtCTX)
+int get_audioStream_index(AVFormatContext *fmtCTX)
 {
   for (unsigned int i = 0; i < fmtCTX->nb_streams; i++) {
     AVStream *stream = fmtCTX->streams[i];
@@ -90,9 +89,9 @@ int get_audioStream(AVFormatContext *fmtCTX)
   return -1;
 }
 
-int get_audio_info(const char *filename)
+int get_audio_info(PlayBackContext *ctx, const char *filename)
 {
-  AVFormatContext *fmtCTX = NULL;
+  AVFormatContext *fmtCTX     = NULL;
   AVCodecContext  *decoderCTX = NULL;
 
   if (avformat_open_input(&fmtCTX, filename, NULL, NULL) < 0)
@@ -103,7 +102,7 @@ int get_audio_info(const char *filename)
     return warn("ffmpeg: cannot find stream info");
   }
 
-  int audioStream_index = get_audioStream(fmtCTX);
+  int audioStream_index = get_audioStream_index(fmtCTX);
   if (audioStream_index < 0) {
     avformat_close_input(&fmtCTX);
     return warn("can't find audioStream");
@@ -131,27 +130,26 @@ int get_audio_info(const char *filename)
     return warn("ffmpeg: cannot open codec!");
   }
 
-  store_information(fmtCTX, decoderCTX, audioStream_index, filename);
-  mpris_notify_change();
+  store_information(ctx, fmtCTX, decoderCTX, audioStream_index, filename);
 
-  tctx.fmtCTX = fmtCTX;
-  tctx.decoderCTX = decoderCTX;
+  ctx->fmtCTX = fmtCTX;
+  ctx->decoderCTX = decoderCTX;
 
   return 0;
 }
 
-int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
+int setup_sample_fmt_resampler(PlayBackContext *ctx, Audio_Info *inf, SwrContext **swrCTX)
 {
   #ifdef LEGACY_LIBSWRSAMPLE
     *swrCTX = swr_alloc_set_opts(*swrCTX,
       inf->ch_layout, inf->sample_fmt, inf->sample_rate,
-      inf->ch_layout, tctx.decoderCTX->sample_fmt, inf->sample_rate,
+      inf->ch_layout, ctx->decoderCTX->sample_fmt, inf->sample_rate,
       0, NULL
     );
   #else
     swr_alloc_set_opts2(swrCTX,
       &inf->ch_layout, inf->sample_fmt, inf->sample_rate,
-      &inf->ch_layout, tctx.decoderCTX->sample_fmt, inf->sample_rate,
+      &inf->ch_layout, ctx->decoderCTX->sample_fmt, inf->sample_rate,
       0, NULL
     );
   #endif
@@ -159,16 +157,16 @@ int setup_sample_fmt_resampler(Audio_Info *inf, SwrContext **swrCTX)
   return 1;
 }
 
-void setup_speed_resampler(Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX)
+void setup_speed_resampler(PlayBackContext *ctx, Audio_Info *inf, AVFrame *frame, SwrContext **speed_swrCTX)
 {
-  int new_rate = (int)(inf->sample_rate / tctx.state.speed);
+  int new_rate = (int)(inf->sample_rate / ctx->state.speed);
   enum AVSampleFormat input_fmt = frame->format;
   enum AVSampleFormat output_fmt = inf->sample_fmt;
 
   #ifdef LEGACY_LIBSWRSAMPLE
-    uint64_t ch_layout_in = tctx.decoderCTX->channel_layout;
+    uint64_t ch_layout_in = ctx->decoderCTX->channel_layout;
     if (ch_layout_in == 0)
-      ch_layout_in = av_get_default_channel_layout(tctx.decoderCTX->channels);
+      ch_layout_in = av_get_default_channel_layout(ctx->decoderCTX->channels);
 
     *speed_swrCTX = swr_alloc_set_opts(NULL,
       ch_layout_in, output_fmt, new_rate,
@@ -206,31 +204,6 @@ void init_playbackstatus(PlaybackStatus *state)
   state->skip_to_next = 0;
 }
 
-void handle_audio_seek(int *duration_time, int64_t *total_samples_played)
-{
-  Audio_Info *inf = &tctx.inf;
-  PlaybackStatus *state = &tctx.state;
-  AVFormatContext *fmtCTX = tctx.fmtCTX;
-  AVCodecContext *codecCTX = tctx.decoderCTX;
-
-  double current_sec = (double)*total_samples_played / inf->sample_rate;
-  double new_position_seconds = current_sec + ((double)state->seek_target / 1000000);
-
-  if (new_position_seconds < 0) new_position_seconds = 0;
-  if (new_position_seconds > *duration_time) new_position_seconds = *duration_time;
-
-  int64_t target_pts = (int64_t)(new_position_seconds / av_q2d(inf->audioStream->time_base));
-
-  av_seek_frame(fmtCTX, inf->audioStream_index, target_pts, AVSEEK_FLAG_BACKWARD);
-  avcodec_flush_buffers(codecCTX);
-
-  *total_samples_played = (int64_t)(new_position_seconds * inf->sample_rate);
-
-  audio_buffer_reset();
-
-  state->seek_request = 0;
-  state->seek_target = 0;
-}
 
 static void apply_metadata_dict(Audio_Metadata *m, AVDictionary *dict)
 {
@@ -247,21 +220,21 @@ static void apply_metadata_dict(Audio_Metadata *m, AVDictionary *dict)
   }
 }
 
-void get_metadata(const char *filename)
+void get_metadata(PlayBackContext *ctx, const char *filename)
 {
-  Audio_Metadata *m = &tctx.state.metadata;
+  Audio_Metadata *m = &ctx->state.metadata;
 
-  apply_metadata_dict(m, tctx.fmtCTX->metadata);
-  int idx = tctx.inf.audioStream_index;
-  if (idx >= 0 && (unsigned)idx < tctx.fmtCTX->nb_streams)
-    apply_metadata_dict(m, tctx.fmtCTX->streams[idx]->metadata);
+  apply_metadata_dict(m, ctx->fmtCTX->metadata);
+  int idx = ctx->inf.audioStream_index;
+  if (idx >= 0 && (unsigned)idx < ctx->fmtCTX->nb_streams)
+    apply_metadata_dict(m, ctx->fmtCTX->streams[idx]->metadata);
 
   if (!m->title[0]) {
     if (filename && strlen(filename) > 0) {
-      extract_title_from_path(filename);
-    } else if (tctx.stream_ctx.is_streaming) {
-      // if (tctx.stream_ctx.original_url) {
-      //   const char *base = strrchr(tctx.stream_ctx.original_url, '/');
+      extract_title_from_path(ctx, filename);
+    } else if (ctx->stream_ctx.is_streaming) {
+      // if (ctx->stream_ctx.original_url) {
+      //   const char *base = strrchr(ctx->stream_ctx.original_url, '/');
       //   if (base) {
       //     base = base + 1;
       //     char *clean = strdup(base);
@@ -290,19 +263,19 @@ void get_metadata(const char *filename)
 // returns:
 // 0 = success
 // -1 = failed, or something happend
-int extract_cover(AVFormatContext *fmt)
+int extract_cover(PlayBackContext *ctx)
 {
   run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
 
-  char *output_path = format("/tmp/tomu_cover_img/%s.jpg", tctx.state.metadata.title);
+  char *output_path = format("/tmp/tomu_cover_img/%s.jpg", ctx->state.metadata.title);
 
-  for (unsigned int i = 0; i < fmt->nb_streams; i++) {
-    AVStream *stream = fmt->streams[i];
+  for (unsigned int i = 0; i < ctx->fmtCTX->nb_streams; i++) {
+    AVStream *stream = ctx->fmtCTX->streams[i];
     if (!stream) continue;
 
 
-    for (unsigned int i = 0; i < fmt->nb_streams; i++) {
-        AVStream *stream = fmt->streams[i];
+    for (unsigned int i = 0; i < ctx->fmtCTX->nb_streams; i++) {
+        AVStream *stream = ctx->fmtCTX->streams[i];
 
         if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
             AVPacket pkt = stream->attached_pic;
@@ -316,11 +289,11 @@ int extract_cover(AVFormatContext *fmt)
             fwrite(pkt.data, 1, pkt.size, f);
             fclose(f);
 
-            // printf("✅ Cover saved: %s\n", output_path);
+            printf("Cover saved: %s\n", output_path);
 
-            strncpy(tctx.state.metadata.cover_path,
+            strncpy(ctx->state.metadata.cover_path,
                     output_path,
-                    sizeof(tctx.state.metadata.cover_path) - 1);
+                    sizeof(ctx->state.metadata.cover_path) - 1);
 
             return 0;
         }
