@@ -1,3 +1,11 @@
+# 6z7y 1.4.0-beta - 2026-07-28
+- Convert the decoder into a normal function; run miniaudio in a separate thread
+- Remove config logic from `src`
+- Remove MPRIS logic from `src`; split it into `tomu-mpris`
+- Rename `tctx` to `ctx`
+- Make `ctx` local instead of global
+- Add communication between `tomu-mpris`
+
 # 6z7y 1.3.7-beta - 2026-07-12
 - fix skip last playback will frezing
 - rename files src
