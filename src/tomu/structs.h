@@ -16,13 +16,6 @@
   #define LEGACY_LIBSWRSAMPLE
 #endif
 
-typedef struct {
-  DBusError err;
-  DBusConnection *conn;
-  DBusMessage *msg;
-  pthread_t thread;
-} DBus_SYSTEM;
-
 typedef enum {
   LOOP_NONE,
   LOOP_TRACK,
@@ -131,7 +124,6 @@ typedef struct {
 } StreamContext;
 
 typedef struct PlayBackContext {
-  DBus_SYSTEM dbus_s;
   AVFormatContext *fmtCTX;
   AVCodecContext *decoderCTX;
   Audio_Buffer *buf;
@@ -140,7 +132,5 @@ typedef struct PlayBackContext {
   LIST_FILES list;
   StreamContext stream_ctx;
 } PlayBackContext;
-
-extern PlayBackContext tctx;
 
 #endif
