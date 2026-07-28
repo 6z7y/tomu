@@ -1,6 +1,8 @@
 #ifndef DECODER_H
 #define DECODER_H
 
-void *run_decoder(void *arg);
+#include "structs.h"
+
+int run_decoder(PlayBackContext *ctx);
 
 #endif

@@ -2,25 +2,26 @@
 #include <unistd.h>
 
 #include "macros.h"
+#include "control.h"
 #include "structs.h"
 #include "player_utils.h"
 #include "output.h"
+#include "utils.h"
 
 #include "../../libs/miniaudio.h"
 
-void *run_decoder(void *arg)
+int run_decoder(PlayBackContext *ctx)
 {
-  (void)arg;
-  AVFormatContext *fmtCTX = tctx.fmtCTX;
-  AVCodecContext *decoderCTX = tctx.decoderCTX;
-  Audio_Info *inf = &tctx.inf;
-  PlaybackStatus *state = &tctx.state;
+  AVFormatContext *fmtCTX = ctx->fmtCTX;
+  AVCodecContext *decoderCTX = ctx->decoderCTX;
+  Audio_Info *inf = &ctx->inf;
+  PlaybackStatus *state = &ctx->state;
 
   SwrContext *swrCTX = NULL;
   SwrContext *speed_swrCTX = NULL;
 
   if (av_sample_fmt_is_planar(decoderCTX->sample_fmt)) {
-    setup_sample_fmt_resampler(inf, &swrCTX);
+    setup_sample_fmt_resampler(ctx, inf, &swrCTX);
     if (swrCTX) {
       if (swr_init(swrCTX) < 0)
         swr_free(&swrCTX);
@@ -34,16 +35,14 @@ void *run_decoder(void *arg)
     printf("ERROR: Failed to allocate packet/frame\n");
     av_packet_free(&packet);
     av_frame_free(&frame);
-    return NULL;
+    return -1;
   }
 
   int64_t total_samples_played = 0;
   int duration_sec = (fmtCTX->duration > 0) ? (int)(fmtCTX->duration / AV_TIME_BASE) : 0;
-  tctx.state.duration = duration_sec;
+  ctx->state.duration = duration_sec;
 
-  pthread_mutex_lock(&state->lock);
   float last_speed = state->speed;
-  pthread_mutex_unlock(&state->lock);
 
 decode:
   while (av_read_frame(fmtCTX, packet) >= 0) {
@@ -56,19 +55,16 @@ decode:
       while (avcodec_receive_frame(decoderCTX, frame) >= 0) {
         double current_time = (double)total_samples_played / inf->sample_rate;
 
-        pthread_mutex_lock(&state->lock);
-        tctx.state.position = (int)current_time;
+        ctx->state.position = (int)current_time;
 
         if (state->seek_request) {
-          handle_audio_seek(&duration_sec, &total_samples_played);
-          pthread_mutex_unlock(&state->lock);
+          handle_audio_seek(ctx, &duration_sec, &total_samples_played);
           av_packet_unref(packet);
           av_frame_unref(frame);
           goto decode;
         }
 
         float current_speed = state->speed;
-        pthread_mutex_unlock(&state->lock);
 
         total_samples_played += frame->nb_samples;
 
@@ -79,18 +75,15 @@ decode:
             speed_swrCTX = NULL;
           }
           if (current_speed != 1.0f)
-            setup_speed_resampler(inf, frame, &speed_swrCTX);
+            setup_speed_resampler(ctx, inf, frame, &speed_swrCTX);
         }
 
-        pthread_mutex_lock(&state->lock);
         while (state->paused)
           pthread_cond_wait(&state->wait_cond, &state->lock);
         if (!state->running) {
-          pthread_mutex_unlock(&state->lock);
           av_frame_unref(frame);
           goto done;
         }
-        pthread_mutex_unlock(&state->lock);
 
         uint8_t *output_data = NULL;
         int output_bytes = 0;
@@ -132,27 +125,25 @@ decode:
         }
 
         if (output_data) {
-          audio_buffer_write(tctx.buf, output_data, output_bytes);
+          audio_buffer_write(ctx->buf, output_data, output_bytes);
           if (output_data != frame->data[0])
             free(output_data);
         }
+
+        write_inf(ctx);
 
         av_frame_unref(frame);
       }
     }
     av_packet_unref(packet);
 
-    pthread_mutex_lock(&state->lock);
     int running = state->running;
-    pthread_mutex_unlock(&state->lock);
     if (!running) goto done;
   }
 
   int loop_type;
-  pthread_mutex_lock(&state->lock);
   loop_type = state->loop;
   int running = state->running;
-  pthread_mutex_unlock(&state->lock);
 
   if (loop_type == LOOP_TRACK && running) {
     av_seek_frame(fmtCTX, -1, 0, AVSEEK_FLAG_BACKWARD);
@@ -163,30 +154,22 @@ decode:
 
 done:
   // this for can hear last pieces not skiped
-  pthread_mutex_lock(&tctx.buf->lock);
-  while (tctx.buf->filled > 0) {
-    pthread_mutex_unlock(&tctx.buf->lock);
+  while (ctx->buf->filled > 0) {
     usleep(50000); // 50ms
-    pthread_mutex_lock(&tctx.buf->lock);
   }
-  pthread_cond_broadcast(&tctx.buf->data_ready);
-  pthread_mutex_unlock(&tctx.buf->lock);
+  pthread_cond_broadcast(&ctx->buf->data_ready);
 
 
-  pthread_mutex_lock(&state->lock);
   state->running = 0;
   pthread_cond_broadcast(&state->wait_cond);
-  pthread_mutex_unlock(&state->lock);
 
-  pthread_mutex_lock(&tctx.buf->lock);
-  tctx.buf->stopped = 1;
-  pthread_cond_broadcast(&tctx.buf->data_ready);
-  pthread_mutex_unlock(&tctx.buf->lock);
+ ctx->buf->stopped = 1;
+  pthread_cond_broadcast(&ctx->buf->data_ready);
 
   if (swrCTX) swr_free(&swrCTX);
   if (speed_swrCTX) swr_free(&speed_swrCTX);
   av_frame_free(&frame);
   av_packet_free(&packet);
 
-  return NULL;
+  return 0;
 }
