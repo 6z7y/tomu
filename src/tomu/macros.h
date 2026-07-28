@@ -6,7 +6,7 @@
 
 // program info
 #define TOMU_NAME "tomu"
-#define TOMU_VER "1.3.7"
+#define TOMU_VER "1.4.0"
 
 
 #define STATE_FILE  "/tmp/tomu.inf"
