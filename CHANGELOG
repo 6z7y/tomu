@@ -1,3 +1,7 @@
+# 6z7y 1.4.1-beta - 2026-08-31
+- improve source code
+- add -n, --no-filter command-line argument
+
 # 6z7y 1.4.0-beta - 2026-07-28
 - Convert the decoder into a normal function; run miniaudio in a separate thread
 - Remove config logic from `src`

@@ -11,9 +11,8 @@
 #include <unistd.h>
 
 #include "structs.h"
-#include "utils.h"
+// #include "utils.h"
 
-#define MINIAUDIO_IMPLEMENTATION
 #include "../../libs/miniaudio.h"
 
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)

@@ -31,6 +31,7 @@ static void add_to_list(PlayBackContext *ctx, LIST_FILES *queue, const char *src
   pthread_mutex_unlock(&ctx->list.pt_lock);
 }
 
+// checking about src is file or url checker
 SRC_TYPE extract_src_type(const char *src)
 {
   if (IS_PATH_RAW(src))     return SRC_FILE_RAW;
@@ -48,13 +49,12 @@ int src_handle(PlayBackContext *ctx, const char *src)
   else if (IS_URL_RAW(src))   src_type = IS_URL_PLAYLIST(src) ? SRC_URL_PLAYLIST : SRC_URL_RAW;
   else src_type = SRC_NONE;
 
-
   // step 2 run correct handle
   switch (src_type) {
     case SRC_NONE:         return -1;
     case SRC_FILE_DIR: case SRC_FILE_RAW:     path_handle(ctx, src, &ctx->list); break;
     // case SRC_URL_PLAYLIST: extract_playlist_url(src); break;
-     case SRC_URL_PLAYLIST: exit(0); break; // test
+    case SRC_URL_PLAYLIST: printf("test\n"); break; // test
     case SRC_URL_RAW:      add_to_list(ctx, &ctx->list, src); break;
   }
   ctx->list.src_type = src_type;
