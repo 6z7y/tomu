@@ -43,6 +43,8 @@ int run_decoder(PlayBackContext *ctx)
   ctx->state.duration = duration_sec;
 
   float last_speed = state->speed;
+  int last_inf_pos = -1;
+  uint8_t *scratch = NULL;
 
 decode:
   while (av_read_frame(fmtCTX, packet) >= 0) {
@@ -91,7 +93,8 @@ decode:
         if (speed_swrCTX) {
           int out_samples = (int)(frame->nb_samples / current_speed);
           output_bytes = out_samples * inf->ch * inf->sample_fmt_bytes;
-          output_data = malloc(output_bytes);
+          if (!scratch) scratch = malloc(ctx->buf->capacity);
+          output_data = scratch;
 
           if (output_data) {
             uint8_t *data_out[1] = {output_data};
@@ -99,14 +102,13 @@ decode:
                                      (const uint8_t**)frame->data, frame->nb_samples);
             if (samples > 0)
               output_bytes = samples * inf->ch * inf->sample_fmt_bytes;
-            else {
-              free(output_data);
+            else
               output_data = NULL;
-            }
           }
         } else if (swrCTX) {
           output_bytes = frame->nb_samples * inf->ch * inf->sample_fmt_bytes;
-          output_data = malloc(output_bytes);
+          if (!scratch) scratch = malloc(ctx->buf->capacity);
+          output_data = scratch;
 
           if (output_data) {
             uint8_t *data[1] = {output_data};
@@ -114,10 +116,8 @@ decode:
                                      (const uint8_t**)frame->data, frame->nb_samples);
             if (samples > 0)
               output_bytes = samples * inf->ch * inf->sample_fmt_bytes;
-            else {
-              free(output_data);
+            else
               output_data = NULL;
-            }
           }
         } else {
           output_bytes = frame->nb_samples * inf->ch * inf->sample_fmt_bytes;
@@ -126,11 +126,12 @@ decode:
 
         if (output_data) {
           audio_buffer_write(ctx->buf, output_data, output_bytes);
-          if (output_data != frame->data[0])
-            free(output_data);
         }
 
-        write_inf(ctx);
+        if (ctx->state.position != last_inf_pos) {
+          write_inf(ctx);
+          last_inf_pos = ctx->state.position;
+        }
 
         av_frame_unref(frame);
       }
@@ -159,15 +160,15 @@ done:
   }
   pthread_cond_broadcast(&ctx->buf->data_ready);
 
-
-  state->running = 0;
-  pthread_cond_broadcast(&state->wait_cond);
-
- ctx->buf->stopped = 1;
-  pthread_cond_broadcast(&ctx->buf->data_ready);
+  // state->running = 0;
+  // pthread_cond_broadcast(&state->wait_cond);
+  //
+  // ctx->buf->stopped = 1;
+  // pthread_cond_broadcast(&ctx->buf->data_ready);
 
   if (swrCTX) swr_free(&swrCTX);
   if (speed_swrCTX) swr_free(&speed_swrCTX);
+  free(scratch);
   av_frame_free(&frame);
   av_packet_free(&packet);
 

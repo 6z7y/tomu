@@ -1,7 +1,6 @@
 #include <fcntl.h>
 #include <libavformat/avformat.h>
 #include <pthread.h>
-#include <dbus/dbus.h>
 #include <curl/curl.h>
 #include <libavcodec/codec.h>
 #include <string.h>
@@ -58,6 +57,8 @@ void cleanUP(PlayBackContext *ctx)
   if (ctx->decoderCTX) {
     avcodec_free_context(&ctx->decoderCTX);
   }
+
+  memset(&ctx->state.metadata, 0, sizeof(Audio_Metadata));
 }
 
 void signal_handle(int sig)
@@ -66,53 +67,53 @@ void signal_handle(int sig)
   _exit(0);
 }
 
-void *read_cmd(void *arg)
-{
-  PlayBackContext *ctx = arg;
-  char buf[2048];
-  char line[256];
-
-  int fd = inotify_init();
-  if (fd < 0) {
-    die("inotify_init:");
-  }
-
-  inotify_add_watch(fd, CMD_FILE, IN_CLOSE_WRITE);
-
-  while (true) {
-    ssize_t len = read(fd, &buf, sizeof(buf));
-    if (len < 0) {
-      warn("read:");
-      return NULL;
-    }
-
-    for (size_t i=0; i<len;) {
-      struct inotify_event *event = (struct inotify_event*)&buf[i];
-
-      if (event->mask & IN_CLOSE_WRITE) {
-        FILE *f = fopen(CMD_FILE, "r");
-
-        while(fgets(line, sizeof(line), f)) {
-          line[strcspn(line, "\n")] = '\0';
-          printf("line: '%s'\n", line);
-          if (!strcmp(line, "OPENURI")) {
-            printf("here\n");
-
-          };
-          if (!strcmp(line, "PLAYPAUSE")) playback_toggle(ctx);
-          if (!strcmp(line, "NEXT")) playback_next_audio(ctx);
-          if (!strcmp(line, "PREV")) playback_prev_audio(ctx);
-          if (!strncmp(line, "OPEN:", 5)) {
-            char *path = line + 5;
-          }
-        }
-        fclose(f);
-        truncate(CMD_FILE, 0);
-      }
-      i += sizeof(struct inotify_event) + event->len;
-    }
-  }
-}
+// void *read_cmd(void *arg)
+// {
+//   PlayBackContext *ctx = arg;
+//   char buf[2048];
+//   char line[256];
+//
+//   int fd = inotify_init();
+//   if (fd < 0) {
+//     die("inotify_init:");
+//   }
+//
+//   inotify_add_watch(fd, CMD_FILE, IN_CLOSE_WRITE);
+//
+//   while (true) {
+//     ssize_t len = read(fd, &buf, sizeof(buf));
+//     if (len < 0) {
+//       warn("read:");
+//       return NULL;
+//     }
+//
+//     for (size_t i=0; i<len;) {
+//       struct inotify_event *event = (struct inotify_event*)&buf[i];
+//
+//       if (event->mask & IN_CLOSE_WRITE) {
+//         FILE *f = fopen(CMD_FILE, "r");
+//
+//         while(fgets(line, sizeof(line), f)) {
+//           line[strcspn(line, "\n")] = '\0';
+//           printf("line: '%s'\n", line);
+//           if (!strcmp(line, "OPENURI")) {
+//             printf("here\n");
+//
+//           };
+//           if (!strcmp(line, "PLAYPAUSE")) playback_toggle(ctx);
+//           if (!strcmp(line, "NEXT")) playback_next_audio(ctx);
+//           if (!strcmp(line, "PREV")) playback_prev_audio(ctx);
+//           if (!strncmp(line, "OPEN:", 5)) {
+//             char *path = line + 5;
+//           }
+//         }
+//         fclose(f);
+//         truncate(CMD_FILE, 0);
+//       }
+//       i += sizeof(struct inotify_event) + event->len;
+//     }
+//   }
+// }
 
 void write_inf(PlayBackContext *ctx)
 {

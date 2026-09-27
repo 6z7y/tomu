@@ -1,3 +1,4 @@
+
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswresample/swresample.h>
@@ -10,9 +11,9 @@
 #include <unistd.h>
 
 #include "structs.h"
-#include "player.h"
 #include "utils.h"
 
+#define MINIAUDIO_IMPLEMENTATION
 #include "../../libs/miniaudio.h"
 
 void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_write)
@@ -24,8 +25,13 @@ void audio_buffer_write(Audio_Buffer *buf, uint8_t *audio_data, int data_must_wr
     return;
   }
 
-  while (buf->filled + data_must_write > (int)buf->capacity)
+  while (buf->filled + data_must_write > (int)buf->capacity && !buf->stopped)
     pthread_cond_wait(&buf->space_free, &buf->lock);
+
+  if (buf->stopped) {
+    pthread_mutex_unlock(&buf->lock);
+    return;
+  }
 
   int space_until_end = (int)buf->capacity - (int)buf->write_pos;
 
@@ -115,8 +121,9 @@ ma_device_config init_miniaudioConfig(PlayBackContext *ctx)
   return ma_config;
 }
 
-Audio_Buffer *audio_buffer_init(int capacity)
+Audio_Buffer *audio_buffer_init(PlayBackContext *ctx)
 {
+  int capacity = (ctx->inf.sample_rate) * (ctx->inf.ch) * (ctx->inf.sample_fmt_bytes) * 2;
   Audio_Buffer *buf = malloc(sizeof(Audio_Buffer));
   if (!buf) return NULL;
 
@@ -126,6 +133,7 @@ Audio_Buffer *audio_buffer_init(int capacity)
   buf->read_pos = 0;
   buf->filled = 0;
   buf->stopped = 0;
+  buf->device_initialized = 0;
 
   pthread_mutex_init(&buf->lock, NULL);
   pthread_cond_init(&buf->data_ready, NULL);
@@ -163,12 +171,13 @@ void *miniaudio_start(void *arg)
 
   if (ma_device_init(NULL, &ma_config, &ctx->buf->device) != MA_SUCCESS) {
     fprintf(stderr, "[player] Failed to initialize miniaudio\n");
-    audio_buffer_destroy(ctx->buf);
-    ctx->buf = NULL;
-    cleanUP(ctx);
-    printf("problem in mini audio start\n");
-    exit(1); // for test if there problem
+    ctx->state.running = 0;
+    ctx->buf->stopped = 1;
+    pthread_cond_broadcast(&ctx->buf->space_free);
+    pthread_cond_broadcast(&ctx->buf->data_ready);
+    return NULL;
   }
+  ctx->buf->device_initialized = 1;
 
   if (ma_device_start(&ctx->buf->device) != MA_SUCCESS) {
     fprintf(stderr, "[player] Failed to start audio device\n");
