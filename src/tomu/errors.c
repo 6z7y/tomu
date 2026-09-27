@@ -2,17 +2,16 @@
 #include <libavcodec/codec.h>
 #include <string.h>
 #include <unistd.h>
-#include <dbus/dbus.h>
 
 #include "errors.h"
 
-void dbus_err_handle(DBusError *err, const char *msg)
-{
-  if (dbus_error_is_set(err)) {
-    dbus_error_free(err);
-    die("tomu: %s", msg);
-  }
-}
+// void dbus_err_handle(DBusError *err, const char *msg)
+// {
+//   if (dbus_error_is_set(err)) {
+//     dbus_error_free(err);
+//     die("tomu: %s", msg);
+//   }
+// }
 
 /* error handle */
 void verr(const char *fmt, va_list ap)
