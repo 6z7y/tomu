@@ -5,9 +5,7 @@
 #include <unistd.h>
 
 #include "../../libs/miniaudio.h"
-#include "output.h"
 #include "errors.h"
-#include "macros.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -89,6 +87,7 @@ int get_audioStream_index(AVFormatContext *fmtCTX)
   return -1;
 }
 
+// extract information from file
 int get_audio_info(PlayBackContext *ctx, const char *filename)
 {
   AVFormatContext *fmtCTX     = NULL;
@@ -189,6 +188,7 @@ void setup_speed_resampler(PlayBackContext *ctx, Audio_Info *inf, AVFrame *frame
     swr_free(speed_swrCTX);
 }
 
+// init default playback_status
 void init_playbackstatus(PlaybackStatus *state)
 {
   state->running = 1;
@@ -197,8 +197,11 @@ void init_playbackstatus(PlaybackStatus *state)
   state->seek_target = 0;
   // state->loop = loop;
   // state->shuffle = shuffle;
+
+  // todo: make it as static
   state->volume = 1.0f;
   state->speed = 1.0f;
+
   state->position = 0;
   state->duration = 0;
   state->skip_to_next = 0;
@@ -265,9 +268,14 @@ void get_metadata(PlayBackContext *ctx, const char *filename)
 // -1 = failed, or something happend
 int extract_cover(PlayBackContext *ctx)
 {
-  run_command("mkdir -p /tmp/tomu_cover_img 2>/dev/null");
+  if (run_command("mkdir /tmp/tomu_cover_img 2>/dev/null") < 0) {
+    // printf("")
+
+  }
 
   char *output_path = format("/tmp/tomu_cover_img/%s.jpg", ctx->state.metadata.title);
+
+  if (!access(output_path, F_OK)) return 0; // file there, exit
 
   for (unsigned int i = 0; i < ctx->fmtCTX->nb_streams; i++) {
     AVStream *stream = ctx->fmtCTX->streams[i];
@@ -275,28 +283,28 @@ int extract_cover(PlayBackContext *ctx)
 
 
     for (unsigned int i = 0; i < ctx->fmtCTX->nb_streams; i++) {
-        AVStream *stream = ctx->fmtCTX->streams[i];
+      AVStream *stream = ctx->fmtCTX->streams[i];
 
-        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-            AVPacket pkt = stream->attached_pic;
+      if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+          AVPacket pkt = stream->attached_pic;
 
-            FILE *f = fopen(output_path, "wb");
-            if (!f) {
-                printf("Could not create output file: %s\n", output_path);
-                return 1;
-            }
+          FILE *f = fopen(output_path, "wb");
+          if (!f) {
+              printf("Could not create output file: %s\n", output_path);
+              return 1;
+          }
 
-            fwrite(pkt.data, 1, pkt.size, f);
-            fclose(f);
+          fwrite(pkt.data, 1, pkt.size, f);
+          fclose(f);
 
-            printf("Cover saved: %s\n", output_path);
+          printf("Cover saved: %s\n", output_path);
 
-            strncpy(ctx->state.metadata.cover_path,
-                    output_path,
-                    sizeof(ctx->state.metadata.cover_path) - 1);
+          strncpy(ctx->state.metadata.cover_path,
+                  output_path,
+                  sizeof(ctx->state.metadata.cover_path) - 1);
 
-            return 0;
-        }
+          return 0;
+      }
     }
   }
 

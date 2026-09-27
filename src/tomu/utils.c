@@ -8,11 +8,10 @@
 #include <unistd.h>
 #include <sys/inotify.h>
 
-#include "control.h"
+// #include "control.h"
 #include "macros.h"
 #include "structs.h"
 #include "errors.h"
-#include "stream.h"
 
 char *format(const char *fmt, ...)
 {

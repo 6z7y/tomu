@@ -8,7 +8,6 @@
 #include <libswresample/swresample.h>
 #include <pthread.h>
 #include <stdatomic.h>
-#include <dbus/dbus.h>
 
 #include "../../libs/miniaudio.h"
 
@@ -69,6 +68,7 @@ typedef struct {
   size_t read_pos;
   int filled;
   int stopped;
+  int device_initialized;
   pthread_mutex_t lock;
   pthread_cond_t data_ready;
   pthread_cond_t space_free;
