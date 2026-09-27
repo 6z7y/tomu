@@ -160,11 +160,11 @@ done:
   }
   pthread_cond_broadcast(&ctx->buf->data_ready);
 
-  // state->running = 0;
-  // pthread_cond_broadcast(&state->wait_cond);
-  //
-  // ctx->buf->stopped = 1;
-  // pthread_cond_broadcast(&ctx->buf->data_ready);
+  state->running = 0;
+  pthread_cond_broadcast(&state->wait_cond);
+
+  ctx->buf->stopped = 1;
+  pthread_cond_broadcast(&ctx->buf->data_ready);
 
   if (swrCTX) swr_free(&swrCTX);
   if (speed_swrCTX) swr_free(&speed_swrCTX);
