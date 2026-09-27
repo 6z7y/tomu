@@ -4,6 +4,7 @@
 #include "../../libs/arg_match.h"
 #include "errors.h"
 #include "macros.h"
+#include "playlist.h"
 #include "structs.h"
 
 void help()
@@ -57,4 +58,7 @@ void args_handle(PlayBackContext *ctx, int argc, char **argv)
     if (arg_match_opts(&argc, argv, help_opts) == 1) { help(); exit(0); }
     if (arg_match_opts(&argc, argv, ver_opts) == 1)  { printf("tomu: %s\n", TOMU_VER); exit(0); }
   }
+
+  // add path to queue
+  src_handle(ctx, argv[1]);
 }
