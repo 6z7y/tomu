@@ -13,30 +13,33 @@ void playback_toggle(PlayBackContext *ctx)
   }
 
   if (ctx->buf) {
-    if (paused) ma_device_stop(&ctx->buf->device);
-    else ma_device_start(&ctx->buf->device);
+    if (paused) {
+      if (ctx->buf->device_initialized) ma_device_stop(&ctx->buf->device);
+    } else {
+      if (ctx->buf->device_initialized) ma_device_start(&ctx->buf->device);
+    }
   }
 }
 
 void playback_stop(PlayBackContext *ctx)
 {
   WITH_LOCK(ctx->state.lock) {
-    if (ctx->buf) ma_device_stop(&ctx->buf->device);
+    if (ctx->buf && ctx->buf->device_initialized) ma_device_stop(&ctx->buf->device);
     ctx->state.skip_to_next = 0;
     ctx->state.running = 0;
     pthread_cond_broadcast(&ctx->state.wait_cond);
   }
 }
 
-void seek_playback(PlayBackContext *ctx, dbus_int64_t offset)
-{
-  // WITH_LOCK(state->lock) {
-    if (!ctx->state.seek_request) {
-      ctx->state.seek_request = 1;
-      ctx->state.seek_target = offset;
-    }
-  // }
-}
+// void seek_playback(PlayBackContext *ctx, dbus_int64_t offset)
+// {
+//   // WITH_LOCK(state->lock) {
+//     if (!ctx->state.seek_request) {
+//       ctx->state.seek_request = 1;
+//       ctx->state.seek_target = offset;
+//     }
+//   // }
+// }
 
 void handle_audio_seek(PlayBackContext *ctx, int *duration_time, int64_t *total_samples_played)
 {
