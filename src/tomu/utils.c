@@ -15,7 +15,7 @@
 #include "errors.h"
 
 int single_instance() {
-  int fd = open("/tmp/tomu.lock", O_CREAT | O_RDONLY);
+  int fd = open("/tmp/tomu.lock", O_CREAT | O_RDWR, 0644);
 
   if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
     return -1;
