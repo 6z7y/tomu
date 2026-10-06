@@ -1,4 +1,3 @@
-#include <fcntl.h>
 #include <libavformat/avformat.h>
 #include <pthread.h>
 #include <curl/curl.h>
@@ -7,11 +6,23 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/inotify.h>
+#include <fcntl.h>
+#include <sys/file.h>
 
 // #include "control.h"
 #include "macros.h"
 #include "structs.h"
 #include "errors.h"
+
+int single_instance() {
+  int fd = open("/tmp/tomu.lock", O_CREAT | O_RDONLY);
+
+  if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
+    return -1;
+  }
+
+  return 0;
+}
 
 char *format(const char *fmt, ...)
 {

@@ -3,6 +3,7 @@
 
 #include "structs.h"
 
+int single_instance();
 void cleanUP(PlayBackContext *ctx);
 void signal_handle(int sig);
 unsigned int get_rand();

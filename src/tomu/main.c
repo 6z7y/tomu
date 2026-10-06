@@ -86,6 +86,9 @@ int main(int argc, char **argv)
   // 0.2. Handle command-line arguments.
   if (argc > 1) args_handle(&ctx, argc, argv);
 
+  // only 1 Tomu will execute!
+  if (single_instance() < 0) die("Tomu is already running!");
+
   // 0.3. Main playback loop.
   while(true) {
     // 1.1 Wait indefinitely if there is no music in the queue.
