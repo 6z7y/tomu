@@ -42,6 +42,8 @@ void args_handle(PlayBackContext *ctx, int argc, char **argv)
   ctx->state.loop = LOOP_NONE;
   ctx->list.filter_files = 1;
 
+  char *source_path = NULL;
+
   // process arguments
   for (int i = 1; i < argc; i++) {
     if (arg_check_opts(argc, argv, loop_opts)) {
@@ -60,5 +62,6 @@ void args_handle(PlayBackContext *ctx, int argc, char **argv)
   }
 
   // add path to queue
-  src_handle(ctx, argv[1]);
+  source_path = argv[1];
+  if (source_path) src_handle(ctx, argv[1]);
 }
