@@ -19,9 +19,14 @@ void fifo_file(PlayBackContext *ctx, int ON)
 {
   if (ON) {
     mkfifo(FIFO_PATH, 0644);
-    ctx->fifoCTX.fifo_file = fopen(FIFO_PATH, "w");
-    if (!ctx->fifoCTX.fifo_file) die("fifo_file:");
-    setvbuf(ctx->fifoCTX.fifo_file, NULL, _IOLBF, 0); // flush automatic with ''\n'
+
+    int f = open(FIFO_PATH, O_RDWR | O_NONBLOCK);
+    if (!f) die("open fifo:");
+
+    ctx->fifoCTX.fifo_file = fdopen(f, "w");
+    if (!ctx->fifoCTX.fifo_file) die("fdopen:");
+
+    setvbuf(ctx->fifoCTX.fifo_file, NULL, _IOLBF, 0); // flush automatic with '\n'
   }
   else {
     fclose(ctx->fifoCTX.fifo_file);

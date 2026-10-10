@@ -93,6 +93,7 @@ int main(int argc, char **argv)
   // 0.2. init fifo file
   fifo_file(&ctx, 1);
   pthread_create(&ctx.fifoCTX.fifo_thread, NULL, fifo_writer_thread, &ctx);
+  pthread_detach(ctx.fifoCTX.fifo_thread);
 
   // 0.3. Main playback loop.
   while(true) {

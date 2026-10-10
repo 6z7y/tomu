@@ -1,3 +1,7 @@
+# 6z7y 1.5.1 - 2026-10-10
+- Fix SIGPIPE causing player exit on FIFO reader dissconnect.
+- Fix Freeze on startup when no FIFO reader is connected.
+
 # 6z7y 1.5.0 - 2026-10-10
 - Added Single-instance guard via `flock` (`/tmp/tomu.lock`); Tomu now runs as only one process.
 - Added FIFO FILE '/tmp/tomu.fifo' for add information of playback context
