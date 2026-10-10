@@ -21,7 +21,7 @@ void fifo_file(PlayBackContext *ctx, int ON)
     mkfifo(FIFO_PATH, 0644);
 
     int f = open(FIFO_PATH, O_RDWR | O_NONBLOCK);
-    if (!f) die("open fifo:");
+    if (f < 0) die("open fifo:");
 
     ctx->fifoCTX.fifo_file = fdopen(f, "w");
     if (!ctx->fifoCTX.fifo_file) die("fdopen:");
