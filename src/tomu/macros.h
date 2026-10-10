@@ -8,9 +8,7 @@
 #define TOMU_NAME "tomu"
 #define TOMU_VER "1.4.1"
 
-
-#define STATE_FILE  "/tmp/tomu.inf"
-#define CMD_FILE    "/tmp/tomu.cmd"
+#define FIFO_PATH "/tmp/tomu.fifo"
 
 // Utils
 #define true 1

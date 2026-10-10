@@ -125,36 +125,36 @@ void signal_handle(int sig)
 //   }
 // }
 
-void write_inf(PlayBackContext *ctx)
-{
-  if (!ctx->state.running) return;
-
-  FILE *f = fopen(STATE_FILE, "w");
-  if (!f) return;
-
-  const char *status = ctx->state.paused ? "Paused" : "Playing";
-  const char *loop = "None";
-  if (ctx->state.loop == LOOP_TRACK)       loop = "Track";
-  else if (ctx->state.loop == LOOP_PLAYLIST) loop = "Playlist";
-
-  fprintf(f, "STATUS:%s\n", status);
-  fprintf(f, "ARTIST:%s\n", ctx->state.metadata.artist);
-  fprintf(f, "TITLE:%s\n", ctx->state.metadata.title);
-  fprintf(f, "ALBUM:%s\n", ctx->state.metadata.album);
-  fprintf(f, "ALBUM_ARTIST:%s\n", ctx->state.metadata.album_artist);
-  fprintf(f, "COMPOSER:%s\n", ctx->state.metadata.composer);
-  fprintf(f, "GENRE:%s\n", ctx->state.metadata.genre);
-  fprintf(f, "DATE:%s\n", ctx->state.metadata.date);
-  fprintf(f, "TRACK:%s\n", ctx->state.metadata.track);
-  fprintf(f, "DISC:%s\n", ctx->state.metadata.disc);
-  fprintf(f, "COVER:%s\n", ctx->state.metadata.cover_path);
-  fprintf(f, "URL:%s\n", ctx->state.metadata.url);
-  fprintf(f, "LOOP:%s\n", loop);
-  fprintf(f, "DURATION:%d\n", ctx->state.duration);
-  fprintf(f, "POSITION:%d\n", ctx->state.position);
-  fprintf(f, "VOLUME:%.2f\n", ctx->state.volume);
-  fprintf(f, "SPEED:%.2f\n", ctx->state.speed);
-  fprintf(f, "SHUFFLE:%d\n", ctx->state.shuffle);
-
-  fclose(f);
-}
+// void write_inf(PlayBackContext *ctx)
+// {
+//   if (!ctx->state.running) return;
+//
+//   FILE *f = fopen(STATE_FILE, "w");
+//   if (!f) return;
+//
+//   const char *status = ctx->state.paused ? "Paused" : "Playing";
+//   const char *loop = "None";
+//   if (ctx->state.loop == LOOP_TRACK)       loop = "Track";
+//   else if (ctx->state.loop == LOOP_PLAYLIST) loop = "Playlist";
+//
+//   fprintf(f, "STATUS:%s\n", status);
+//   fprintf(f, "ARTIST:%s\n", ctx->state.metadata.artist);
+//   fprintf(f, "TITLE:%s\n", ctx->state.metadata.title);
+//   fprintf(f, "ALBUM:%s\n", ctx->state.metadata.album);
+//   fprintf(f, "ALBUM_ARTIST:%s\n", ctx->state.metadata.album_artist);
+//   fprintf(f, "COMPOSER:%s\n", ctx->state.metadata.composer);
+//   fprintf(f, "GENRE:%s\n", ctx->state.metadata.genre);
+//   fprintf(f, "DATE:%s\n", ctx->state.metadata.date);
+//   fprintf(f, "TRACK:%s\n", ctx->state.metadata.track);
+//   fprintf(f, "DISC:%s\n", ctx->state.metadata.disc);
+//   fprintf(f, "COVER:%s\n", ctx->state.metadata.cover_path);
+//   fprintf(f, "URL:%s\n", ctx->state.metadata.url);
+//   fprintf(f, "LOOP:%s\n", loop);
+//   fprintf(f, "DURATION:%d\n", ctx->state.duration);
+//   fprintf(f, "POSITION:%d\n", ctx->state.position);
+//   fprintf(f, "VOLUME:%.2f\n", ctx->state.volume);
+//   fprintf(f, "SPEED:%.2f\n", ctx->state.speed);
+//   fprintf(f, "SHUFFLE:%d\n", ctx->state.shuffle);
+//
+//   fclose(f);
+// }

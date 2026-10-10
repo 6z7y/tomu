@@ -129,7 +129,7 @@ decode:
         }
 
         if (ctx->state.position != last_inf_pos) {
-          write_inf(ctx);
+          // write_inf(ctx);
           last_inf_pos = ctx->state.position;
         }
 

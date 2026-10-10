@@ -123,6 +123,11 @@ typedef struct {
   StreamBuf *stream_buf;
 } StreamContext;
 
+typedef struct {
+  pthread_t fifo_thread;
+  FILE *fifo_file;
+} FIFOContext;
+
 typedef struct PlayBackContext {
   AVFormatContext *fmtCTX;
   AVCodecContext *decoderCTX;
@@ -130,6 +135,7 @@ typedef struct PlayBackContext {
   PlaybackStatus state;
   Audio_Info inf;
   LIST_FILES list;
+  FIFOContext fifoCTX;
   StreamContext stream_ctx;
 } PlayBackContext;
 

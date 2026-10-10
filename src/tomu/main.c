@@ -12,6 +12,7 @@
 #include "player_utils.h"
 #include "errors.h"
 #include "playlist.h"
+#include "fifo_handle.h"
 #include "structs.h"
 #include "macros.h"
 #include "utils.h"
@@ -78,16 +79,20 @@ int main(int argc, char **argv)
 {
   if (signal(SIGINT, signal_handle) == SIG_ERR) die("signal SIGINT:");
   if (signal(SIGTERM, signal_handle) == SIG_ERR) die("signal SIGTERM:");
+  signal(SIGPIPE, SIG_IGN); // ignore close pipe file
   av_log_set_level(AV_LOG_QUIET); // ignore warning from ffmpeg
 
-  // 0.1. Initialize playback context.
   PlayBackContext ctx = {0};
 
-  // 0.2. Handle command-line arguments.
+  // 0.1. Handle command-line arguments.
   if (argc > 1) args_handle(&ctx, argc, argv);
 
   // only 1 Tomu will execute!
   if (single_instance() < 0) die("Tomu is already running!");
+
+  // 0.2. init fifo file
+  fifo_file(&ctx, 1);
+  pthread_create(&ctx.fifoCTX.fifo_thread, NULL, fifo_writer_thread, &ctx);
 
   // 0.3. Main playback loop.
   while(true) {
