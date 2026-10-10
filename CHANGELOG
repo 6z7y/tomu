@@ -1,3 +1,8 @@
+# 6z7y 1.5.0 - 2026-10-10
+- Added Single-instance guard via `flock` (`/tmp/tomu.lock`); Tomu now runs as only one process.
+- Added FIFO FILE '/tmp/tomu.fifo' for add information of playback context
+
+
 # 6z7y 1.4.1-beta - 2026-08-31
 - improve source code
 - add -n, --no-filter command-line argument

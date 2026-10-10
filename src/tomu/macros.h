@@ -6,7 +6,7 @@
 
 // program info
 #define TOMU_NAME "tomu"
-#define TOMU_VER "1.4.1"
+#define TOMU_VER "1.5.0"
 
 #define FIFO_PATH "/tmp/tomu.fifo"
 
