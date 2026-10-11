@@ -1,3 +1,8 @@
+# 6z7y 1.5.2 - 2026-10-10
+- fix crash when parsing arg flag.
+- Add support for receiving client commands from clients via '/tmp/tomu.cmd' using notify.
+- rename '/tmp/tomu.fifo' to '/tmp/tomu.inf'
+
 # 6z7y 1.5.1 - 2026-10-10
 - Fix SIGPIPE causing player exit on FIFO reader dissconnect.
 - Fix Freeze on startup when no FIFO reader is connected.
