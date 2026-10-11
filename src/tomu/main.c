@@ -95,6 +95,10 @@ int main(int argc, char **argv)
   pthread_create(&ctx.fifoCTX.fifo_thread, NULL, fifo_writer_thread, &ctx);
   pthread_detach(ctx.fifoCTX.fifo_thread);
 
+  // 0.3. init fn for read cmd from clients
+  pthread_create(&ctx.read_cmd_thread, NULL, read_cmd, &ctx);
+  pthread_detach(ctx.read_cmd_thread);
+
   // 0.3. Main playback loop.
   while(true) {
     // 1.1 Wait indefinitely if there is no music in the queue.
