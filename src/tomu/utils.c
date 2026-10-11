@@ -1,7 +1,9 @@
+#include <errno.h>
 #include <libavformat/avformat.h>
 #include <pthread.h>
 #include <curl/curl.h>
 #include <libavcodec/codec.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -10,7 +12,9 @@
 #include <sys/file.h>
 
 // #include "control.h"
+#include "control.h"
 #include "macros.h"
+#include "playlist.h"
 #include "structs.h"
 #include "errors.h"
 
@@ -77,84 +81,69 @@ void signal_handle(int sig)
   _exit(0);
 }
 
-// void *read_cmd(void *arg)
-// {
-//   PlayBackContext *ctx = arg;
-//   char buf[2048];
-//   char line[256];
-//
-//   int fd = inotify_init();
-//   if (fd < 0) {
-//     die("inotify_init:");
-//   }
-//
-//   inotify_add_watch(fd, CMD_FILE, IN_CLOSE_WRITE);
-//
-//   while (true) {
-//     ssize_t len = read(fd, &buf, sizeof(buf));
-//     if (len < 0) {
-//       warn("read:");
-//       return NULL;
-//     }
-//
-//     for (size_t i=0; i<len;) {
-//       struct inotify_event *event = (struct inotify_event*)&buf[i];
-//
-//       if (event->mask & IN_CLOSE_WRITE) {
-//         FILE *f = fopen(CMD_FILE, "r");
-//
-//         while(fgets(line, sizeof(line), f)) {
-//           line[strcspn(line, "\n")] = '\0';
-//           printf("line: '%s'\n", line);
-//           if (!strcmp(line, "OPENURI")) {
-//             printf("here\n");
-//
-//           };
-//           if (!strcmp(line, "PLAYPAUSE")) playback_toggle(ctx);
-//           if (!strcmp(line, "NEXT")) playback_next_audio(ctx);
-//           if (!strcmp(line, "PREV")) playback_prev_audio(ctx);
-//           if (!strncmp(line, "OPEN:", 5)) {
-//             char *path = line + 5;
-//           }
-//         }
-//         fclose(f);
-//         truncate(CMD_FILE, 0);
-//       }
-//       i += sizeof(struct inotify_event) + event->len;
-//     }
-//   }
-// }
+void *read_cmd(void *arg)
+{
+  PlayBackContext *ctx = arg;
 
-// void write_inf(PlayBackContext *ctx)
-// {
-//   if (!ctx->state.running) return;
-//
-//   FILE *f = fopen(STATE_FILE, "w");
-//   if (!f) return;
-//
-//   const char *status = ctx->state.paused ? "Paused" : "Playing";
-//   const char *loop = "None";
-//   if (ctx->state.loop == LOOP_TRACK)       loop = "Track";
-//   else if (ctx->state.loop == LOOP_PLAYLIST) loop = "Playlist";
-//
-//   fprintf(f, "STATUS:%s\n", status);
-//   fprintf(f, "ARTIST:%s\n", ctx->state.metadata.artist);
-//   fprintf(f, "TITLE:%s\n", ctx->state.metadata.title);
-//   fprintf(f, "ALBUM:%s\n", ctx->state.metadata.album);
-//   fprintf(f, "ALBUM_ARTIST:%s\n", ctx->state.metadata.album_artist);
-//   fprintf(f, "COMPOSER:%s\n", ctx->state.metadata.composer);
-//   fprintf(f, "GENRE:%s\n", ctx->state.metadata.genre);
-//   fprintf(f, "DATE:%s\n", ctx->state.metadata.date);
-//   fprintf(f, "TRACK:%s\n", ctx->state.metadata.track);
-//   fprintf(f, "DISC:%s\n", ctx->state.metadata.disc);
-//   fprintf(f, "COVER:%s\n", ctx->state.metadata.cover_path);
-//   fprintf(f, "URL:%s\n", ctx->state.metadata.url);
-//   fprintf(f, "LOOP:%s\n", loop);
-//   fprintf(f, "DURATION:%d\n", ctx->state.duration);
-//   fprintf(f, "POSITION:%d\n", ctx->state.position);
-//   fprintf(f, "VOLUME:%.2f\n", ctx->state.volume);
-//   fprintf(f, "SPEED:%.2f\n", ctx->state.speed);
-//   fprintf(f, "SHUFFLE:%d\n", ctx->state.shuffle);
-//
-//   fclose(f);
-// }
+  // create fifo cmd file
+  int ffd = open(CMD_FILE, O_CREAT | O_WRONLY, 0644);
+  if (ffd >= 0) close(ffd);
+
+  char buf[2048];
+  char line[256];
+
+  int fd = inotify_init();
+  if (fd < 0) {
+    die("inotify_init:");
+  }
+
+  inotify_add_watch(fd, CMD_FILE, IN_CLOSE_WRITE);
+
+  while (true) {
+    ssize_t len = read(fd, buf, sizeof(buf));
+    if (len < 0) {
+      if (errno == EINTR) continue;// todo: practies errno
+      warn("read:");
+      return NULL;
+    }
+
+    for (size_t i=0; i< (size_t)len;) {
+      struct inotify_event *event = (struct inotify_event*)&buf[i];
+
+      if (event->mask & IN_CLOSE_WRITE) {
+        FILE *f = fopen(CMD_FILE, "r");
+        int had = 0;
+        if (f) {
+          while(fgets(line, sizeof(line), f)) {
+            line[strcspn(line, "\n")] = '\0';
+            if (!line[0]) continue;
+            had = 1;
+            printf("line: '%s'\n", line);
+
+              if      (!strcmp(line, "PLAYPAUSE"))  playback_toggle(ctx);
+              else if (!strcmp(line, "PLAY"))       ctx->state.paused = 0;
+              else if (!strcmp(line, "PAUSE"))      ctx->state.paused = 1;
+              else if (!strcmp(line, "STOP"))       playback_stop(ctx);
+              else if (!strcmp(line, "NEXT"))       playback_next_audio(ctx);
+              else if (!strcmp(line, "PREV"))       playback_prev_audio(ctx);
+              else if (!strncmp(line, "OPEN:", 5))  src_handle(ctx, line + 5);
+              // else if (!strncmp(line, "SETVOLUME:", 10))  playback_set_volume(ctx, atof(line + 10));
+              // else if (!strncmp(line, "SETLOOP:", 8))     playback_set_loop(ctx, line + 8);
+              // else if (!strncmp(line, "SETSHUFFLE:", 11)) playback_set_shuffle(ctx, atoi(line + 11));
+              // else if (!strncmp(line, "SETSPEED:", 9))    playback_set_speed(ctx, atof(line + 9));
+              // else if (!strncmp(line, "SEEK:", 5))        playback_seek(ctx, atol(line + 5));
+              // else if (!strncmp(line, "SETPOS:", 7))      playback_set_position(ctx, atol(line + 7));
+          }
+        }
+        rewind(f);
+        ftruncate(fileno(f), 0);
+        fclose(f);
+        if (had) {
+          int t = open(CMD_FILE, O_WRONLY | O_TRUNC);
+          if (t >= 0) close(t);
+        }
+      }
+      i += sizeof(struct inotify_event) + event->len;
+    }
+  }
+}
