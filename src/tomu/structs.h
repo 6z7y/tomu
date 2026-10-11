@@ -136,6 +136,7 @@ typedef struct PlayBackContext {
   Audio_Info inf;
   LIST_FILES list;
   FIFOContext fifoCTX;
+  pthread_t read_cmd_thread;
   StreamContext stream_ctx;
 } PlayBackContext;
 
