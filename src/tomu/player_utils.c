@@ -275,7 +275,14 @@ int extract_cover(PlayBackContext *ctx)
 
   char *output_path = format("/tmp/tomu_cover_img/%s.jpg", ctx->state.metadata.title);
 
-  if (!access(output_path, F_OK)) return 0; // file there, exit
+  if (!access(output_path, F_OK)) {
+    strncpy(ctx->state.metadata.cover_path,
+            output_path,
+            sizeof(ctx->state.metadata.cover_path) - 1);
+    ctx->state.metadata.cover_path[sizeof(ctx->state.metadata.cover_path) - 1] = '\0';
+
+    return 0; // file there, exit
+  }
 
   for (unsigned int i = 0; i < ctx->fmtCTX->nb_streams; i++) {
     AVStream *stream = ctx->fmtCTX->streams[i];
@@ -297,11 +304,15 @@ int extract_cover(PlayBackContext *ctx)
           fwrite(pkt.data, 1, pkt.size, f);
           fclose(f);
 
-          printf("Cover saved: %s\n", output_path);
-
           strncpy(ctx->state.metadata.cover_path,
                   output_path,
                   sizeof(ctx->state.metadata.cover_path) - 1);
+          ctx->state.metadata.cover_path[sizeof(ctx->state.metadata.cover_path) - 1] = '\0';
+          printf("Cover saved: %s\n", output_path);
+
+          // strncpy(ctx->state.metadata.cover_path,
+          //         output_path,
+          //         sizeof(ctx->state.metadata.cover_path) - 1);
 
           return 0;
       }
